@@ -34,12 +34,12 @@ class PingsOverlay extends Overlay
         this.client = client;
         this.plugin = plugin;
         setPosition(OverlayPosition.DYNAMIC);
-        ENROUTE = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/janbird.png");
-        AVOID = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/janbird.png");
-        CAUTION = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/janbird.png");
+        ENROUTE = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/enroutemark.png");
+        AVOID = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/avoidmark.png");
+        CAUTION = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/exclamationmark.png");
         QUESTION = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/questionmark.png");
-        ATTACK = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/janbird.png");
-        DEFEND = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/janbird.png");
+        ATTACK = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/attackmark.png");
+        DEFEND = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/defendmark.png");
     }
 
     @Override
