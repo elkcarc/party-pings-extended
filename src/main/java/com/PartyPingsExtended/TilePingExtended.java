@@ -13,4 +13,5 @@ import java.awt.*;
 public class TilePingExtended extends PartyMemberMessage{
     private final WorldPoint point;
     private final Color color;
+    private final PingType pingType;
 }

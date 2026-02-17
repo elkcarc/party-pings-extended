@@ -73,5 +73,14 @@ public interface PartyPingsExtendedConfig extends Config
 		return true;
 	}
 
-
+	@ConfigItem(
+			keyName = "pingType",
+			name = "Ping Type",
+			description = "Selects Ping Image Type",
+			position = 7
+	)
+	default PingType pingType()
+	{
+		return PingType.QUESTION;
+	}
 }

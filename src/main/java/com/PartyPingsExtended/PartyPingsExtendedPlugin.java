@@ -154,7 +154,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 		}
 
 		event.consume();
-		final TilePingExtended tilePing = new TilePingExtended(selectedSceneTile.getWorldLocation(), this.config.memberColor());
+		final TilePingExtended tilePing = new TilePingExtended(selectedSceneTile.getWorldLocation(), this.config.memberColor(), config.pingType());
 		clientThread.invoke(() -> client.playSoundEffect(SoundEffectID.SMITH_ANVIL_TONK));
 		clientThread.invokeLater(() -> party.send(tilePing));
 	}
@@ -165,7 +165,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 		if (config.pings())
 		{
 			final Color color = event.getColor() != null ? event.getColor() : Color.RED;
-			pendingTilePingsExtended.add(new PartyTilePingDataExtended(event.getPoint(), color));
+			pendingTilePingsExtended.add(new PartyTilePingDataExtended(event.getPoint(), color, event.getPingType()));
 		}
 
 		if (config.sounds())

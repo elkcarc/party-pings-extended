@@ -18,7 +18,14 @@ class PingsOverlay extends Overlay
 {
     private final Client client;
     private final PartyPingsExtendedPlugin plugin;
-    private final BufferedImage ARROW_ICON;
+    private final BufferedImage ENROUTE;
+    private final BufferedImage AVOID;
+    private final BufferedImage CAUTION;
+    private final BufferedImage QUESTION;
+    private final BufferedImage ATTACK;
+    private final BufferedImage DEFEND;
+
+
 
 
     @Inject
@@ -27,7 +34,12 @@ class PingsOverlay extends Overlay
         this.client = client;
         this.plugin = plugin;
         setPosition(OverlayPosition.DYNAMIC);
-        ARROW_ICON = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/questionmark.png");
+        ENROUTE = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/janbird.png");
+        AVOID = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/janbird.png");
+        CAUTION = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/janbird.png");
+        QUESTION = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/questionmark.png");
+        ATTACK = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/janbird.png");
+        DEFEND = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/janbird.png");
     }
 
     @Override
@@ -81,20 +93,46 @@ class PingsOverlay extends Overlay
                 ping.getAlpha());
 
         OverlayUtil.renderPolygon(graphics, poly, color);
-        renderGlyphPing(graphics, localPoint);
+        renderGlyphPing(graphics, localPoint, ping);
     }
-    private void renderGlyphPing(final Graphics2D graphics, final LocalPoint dest)
+    private void renderGlyphPing(final Graphics2D graphics, final LocalPoint dest, PartyTilePingDataExtended ping)
     {
         if (dest == null)
         {
             return;
         }
 
-        Point canvasLoc = Perspective.getCanvasImageLocation(client, dest, ARROW_ICON, 120 + (int) (10 * Math.sin(client.getGameCycle() / 6.0)));
+        BufferedImage Glyph;
+
+        switch(ping.getPingType().getPingType())
+        {
+            case 1:
+                Glyph = ENROUTE;
+                break;
+            case 2:
+                Glyph = AVOID;
+                break;
+            case 3:
+                Glyph = CAUTION;
+                break;
+            case 4:
+                Glyph = QUESTION;
+                break;
+            case 5:
+                Glyph = ATTACK;
+                break;
+            case 6:
+                Glyph = DEFEND;
+                break;
+            default:
+                return;
+        }
+
+        Point canvasLoc = Perspective.getCanvasImageLocation(client, dest, Glyph, 120 + (int) (10 * Math.sin(client.getGameCycle() / 6.0)));
 
         if (canvasLoc != null)
         {
-            OverlayUtil.renderImageLocation(graphics, canvasLoc, ARROW_ICON);
+            OverlayUtil.renderImageLocation(graphics, canvasLoc, Glyph);
         }
 
     }
