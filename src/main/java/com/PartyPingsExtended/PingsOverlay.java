@@ -1,23 +1,25 @@
 package com.PartyPingsExtended;
 
-import java.awt.Color;
-import java.awt.Dimension;
-import java.awt.Graphics2D;
-import java.awt.Polygon;
+import java.awt.*;
+import java.awt.image.BufferedImage;
 import java.util.Iterator;
 import javax.inject.Inject;
 import net.runelite.api.Client;
 import net.runelite.api.Perspective;
+import net.runelite.api.Point;
 import net.runelite.api.coords.LocalPoint;
 import net.runelite.client.plugins.party.data.PartyTilePingData;
 import net.runelite.client.ui.overlay.Overlay;
 import net.runelite.client.ui.overlay.OverlayPosition;
 import net.runelite.client.ui.overlay.OverlayUtil;
+import net.runelite.client.util.ImageUtil;
 
 class PingsOverlay extends Overlay
 {
     private final Client client;
     private final PartyPingsExtendedPlugin plugin;
+    private final BufferedImage ARROW_ICON;
+
 
     @Inject
     private PingsOverlay(final Client client, final PartyPingsExtendedPlugin plugin)
@@ -25,6 +27,7 @@ class PingsOverlay extends Overlay
         this.client = client;
         this.plugin = plugin;
         setPosition(OverlayPosition.DYNAMIC);
+        ARROW_ICON = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/questionmark.png");
     }
 
     @Override
@@ -63,6 +66,7 @@ class PingsOverlay extends Overlay
             return;
         }
 
+
         final Polygon poly = Perspective.getCanvasTilePoly(client, localPoint);
 
         if (poly == null)
@@ -77,5 +81,21 @@ class PingsOverlay extends Overlay
                 ping.getAlpha());
 
         OverlayUtil.renderPolygon(graphics, poly, color);
+        renderGlyphPing(graphics, localPoint);
+    }
+    private void renderGlyphPing(final Graphics2D graphics, final LocalPoint dest)
+    {
+        if (dest == null)
+        {
+            return;
+        }
+
+        Point canvasLoc = Perspective.getCanvasImageLocation(client, dest, ARROW_ICON, 120 + (int) (10 * Math.sin(client.getGameCycle() / 6.0)));
+
+        if (canvasLoc != null)
+        {
+            OverlayUtil.renderImageLocation(graphics, canvasLoc, ARROW_ICON);
+        }
+
     }
 }
