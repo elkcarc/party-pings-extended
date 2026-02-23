@@ -81,7 +81,12 @@ public class PartyPingsExtendedPlugin extends Plugin
 	protected void startUp()
 	{
 		wsClient.registerMessage(TilePingExtended.class);
-		keyManager.registerKeyListener(hotkeyListener);
+		keyManager.registerKeyListener(enrouteHotkeyListener);
+		keyManager.registerKeyListener(avoidHotkeyListener);
+		keyManager.registerKeyListener(cautionHotkeyListener);
+		keyManager.registerKeyListener(questionHotkeyListener);
+		keyManager.registerKeyListener(attackHotkeyListener);
+		keyManager.registerKeyListener(defendHotkeyListener);
 		overlayManager.add(pingsOverlay);
 	}
 
@@ -89,7 +94,12 @@ public class PartyPingsExtendedPlugin extends Plugin
 	protected void shutDown()
 	{
 		wsClient.unregisterMessage(TilePingExtended.class);
-		keyManager.unregisterKeyListener(hotkeyListener);
+		keyManager.unregisterKeyListener(enrouteHotkeyListener);
+		keyManager.unregisterKeyListener(avoidHotkeyListener);
+		keyManager.unregisterKeyListener(cautionHotkeyListener);
+		keyManager.unregisterKeyListener(questionHotkeyListener);
+		keyManager.unregisterKeyListener(attackHotkeyListener);
+		keyManager.unregisterKeyListener(defendHotkeyListener);
 		overlayManager.remove(pingsOverlay);
 	}
 
@@ -98,31 +108,117 @@ public class PartyPingsExtendedPlugin extends Plugin
 	{
 		if (!focusChanged.isFocused())
 		{
-			hotkeyPressed = false;
+			enrouteHotkeyPressed = false;
+			avoidHotkeyPressed = false;
+			cautionHotkeyPressed = false;
+			questionHotkeyPressed = false;
+			attackHotkeyPressed = false;
+			defendHotkeyPressed = false;
 		}
 	}
 
-	private final HotkeyListener hotkeyListener = new HotkeyListener(() -> config.pingHotkey())
+	private final HotkeyListener enrouteHotkeyListener = new HotkeyListener(() -> config.enroutePingHotkey())
 	{
 		@Override
 		public void hotkeyPressed()
 		{
-			hotkeyPressed = true;
+			enrouteHotkeyPressed = true;
 		}
 
 		@Override
 		public void hotkeyReleased()
 		{
-			hotkeyPressed = false;
+			enrouteHotkeyPressed = false;
 		}
 	};
-	private boolean hotkeyPressed = false;
+	private boolean enrouteHotkeyPressed = false;
+
+	private final HotkeyListener avoidHotkeyListener = new HotkeyListener(() -> config.avoidPingHotkey())
+	{
+		@Override
+		public void hotkeyPressed()
+		{
+			avoidHotkeyPressed = true;
+		}
+
+		@Override
+		public void hotkeyReleased()
+		{
+			avoidHotkeyPressed = false;
+		}
+	};
+	private boolean avoidHotkeyPressed = false;
+
+	private final HotkeyListener cautionHotkeyListener = new HotkeyListener(() -> config.cautionPingHotkey())
+	{
+		@Override
+		public void hotkeyPressed()
+		{
+			cautionHotkeyPressed = true;
+		}
+
+		@Override
+		public void hotkeyReleased()
+		{
+			cautionHotkeyPressed = false;
+		}
+	};
+	private boolean cautionHotkeyPressed = false;
+
+	private final HotkeyListener questionHotkeyListener = new HotkeyListener(() -> config.questionPingHotkey())
+	{
+		@Override
+		public void hotkeyPressed()
+		{
+			questionHotkeyPressed = true;
+		}
+
+		@Override
+		public void hotkeyReleased()
+		{
+			questionHotkeyPressed = false;
+		}
+	};
+	private boolean questionHotkeyPressed = false;
+
+	private final HotkeyListener attackHotkeyListener = new HotkeyListener(() -> config.attackPingHotkey())
+	{
+		@Override
+		public void hotkeyPressed()
+		{
+			attackHotkeyPressed = true;
+		}
+
+		@Override
+		public void hotkeyReleased()
+		{
+			attackHotkeyPressed = false;
+		}
+	};
+	private boolean attackHotkeyPressed = false;
+
+	private final HotkeyListener defendHotkeyListener = new HotkeyListener(() -> config.defendPingHotkey())
+	{
+		@Override
+		public void hotkeyPressed()
+		{
+			defendHotkeyPressed = true;
+		}
+
+		@Override
+		public void hotkeyReleased()
+		{
+			defendHotkeyPressed = false;
+		}
+	};
+	private boolean defendHotkeyPressed = false;
 
 	@Subscribe
 	public void onMenuOptionClicked(MenuOptionClicked event)
 	{
+		boolean hotkeyPressed = enrouteHotkeyPressed || avoidHotkeyPressed || cautionHotkeyPressed || questionHotkeyPressed || attackHotkeyPressed || defendHotkeyPressed;
 
-		if (!hotkeyPressed || client.isMenuOpen() || !party.isInParty() || !config.pings() )
+		if (!hotkeyPressed || client.isMenuOpen() || !party.isInParty() )
 		{
 			return;
 		}
@@ -153,8 +249,10 @@ public class PartyPingsExtendedPlugin extends Plugin
 			return;
 		}
 
+		PingType pingType = PingType.QUESTION; //todo determine based on key
+
 		event.consume();
-		final TilePingExtended tilePing = new TilePingExtended(selectedSceneTile.getWorldLocation(), this.config.memberColor(), config.pingType());
+		final TilePingExtended tilePing = new TilePingExtended(selectedSceneTile.getWorldLocation(), this.config.memberColor(), pingType);
 		clientThread.invoke(() -> client.playSoundEffect(SoundEffectID.SMITH_ANVIL_TONK));
 		clientThread.invokeLater(() -> party.send(tilePing));
 	}
@@ -162,11 +260,8 @@ public class PartyPingsExtendedPlugin extends Plugin
 	@Subscribe
 	public void onTilePingExtended(TilePingExtended event)
 	{
-		if (config.pings())
-		{
-			final Color color = event.getColor() != null ? event.getColor() : Color.RED;
-			pendingTilePingsExtended.add(new PartyTilePingDataExtended(event.getPoint(), color, event.getPingType()));
-		}
+		final Color color = event.getColor() != null ? event.getColor() : Color.RED;
+		pendingTilePingsExtended.add(new PartyTilePingDataExtended(event.getPoint(), color, event.getPingType()));
 
 		if (config.sounds())
 		{

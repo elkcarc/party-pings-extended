@@ -4,17 +4,29 @@ import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
 import java.awt.Color;
-import net.runelite.client.config.ConfigSection;
 import net.runelite.client.config.Keybind;
 
 @ConfigGroup("Party Pings Extended")
 public interface PartyPingsExtendedConfig extends Config
 {
+
+	@ConfigItem(
+			keyName = "tilePings",
+			name = "Tile Highlight",
+			description = "Enables Tile Highlighting on ping.<br>"
+					+ "To ping, hold the ping hotkey down and click on the tile you want to ping.",
+			position = 1
+	)
+	default boolean tilePings()
+	{
+		return true;
+	}
+
 	@ConfigItem(
 			keyName = "sounds",
 			name = "Sound on ping",
 			description = "Enables sound notification on party ping.",
-			position = 1
+			position = 2
 	)
 	default boolean sounds()
 	{
@@ -25,7 +37,7 @@ public interface PartyPingsExtendedConfig extends Config
 			keyName = "recolorNames",
 			name = "Recolor names",
 			description = "Recolor party members names based on unique color hash.",
-			position = 2
+			position = 3
 	)
 	default boolean recolorNames()
 	{
@@ -36,7 +48,7 @@ public interface PartyPingsExtendedConfig extends Config
 			keyName = "memberColor",
 			name = "Self-color",
 			description = "Which color you will appear as in the party panel and tile pings.",
-			position = 3
+			position = 4
 	)
 	Color memberColor();
 
@@ -44,43 +56,80 @@ public interface PartyPingsExtendedConfig extends Config
 			keyName = "memberColor",
 			name = "",
 			description = "",
-			position = 4
+			position = 5
 	)
 	void setMemberColor(Color newMemberColor);
 
 
 	@ConfigItem(
-			keyName = "pingHotkey",
-			name = "Ping hotkey",
-			description = "Key to hold to send a tile ping.<br>"
+			keyName = "enroutePingHotkey",
+			name = "En-route ping hotkey",
+			description = "Key to hold to send a tile ping with an en-route symbol.<br>"
 					+ "To ping, hold the ping hotkey down and click on the tile you want to ping.",
-			position = 5
+			position = 6
 	)
-	default Keybind pingHotkey()
+	default Keybind enroutePingHotkey()
 	{
 		return Keybind.NOT_SET;
 	}
 
 	@ConfigItem(
-			keyName = "pings",
-			name = "Pings",
-			description = "Enables party pings.<br>"
+			keyName = "avoidPingHotkey",
+			name = "Avoid ping hotkey",
+			description = "Key to hold to send a tile ping with an avoid symbol.<br>"
 					+ "To ping, hold the ping hotkey down and click on the tile you want to ping.",
-			position = 6
+			position = 7
 	)
-	default boolean pings()
+	default Keybind avoidPingHotkey()
 	{
-		return true;
+		return Keybind.NOT_SET;
 	}
 
 	@ConfigItem(
-			keyName = "pingType",
-			name = "Ping Type",
-			description = "Selects Ping Image Type",
-			position = 7
+			keyName = "cautionPingHotkey",
+			name = "Caution ping hotkey",
+			description = "Key to hold to send a  tile ping with a caution symbol.<br>"
+					+ "To ping, hold the ping hotkey down and click on the tile you want to ping.",
+			position = 8
 	)
-	default PingType pingType()
+	default Keybind cautionPingHotkey()
 	{
-		return PingType.QUESTION;
+		return Keybind.NOT_SET;
+	}
+
+	@ConfigItem(
+			keyName = "questionPingHotkey",
+			name = "Question ping hotkey",
+			description = "Key to hold to send a tile ping with a question symbol.<br>"
+					+ "To ping, hold the ping hotkey down and click on the tile you want to ping.",
+			position = 9
+	)
+	default Keybind questionPingHotkey()
+	{
+		return Keybind.NOT_SET;
+	}
+
+	@ConfigItem(
+			keyName = "attackPingHotkey",
+			name = "Attack ping hotkey",
+			description = "Key to hold to send a tile ping with an attack symbol.<br>"
+					+ "To ping, hold the ping hotkey down and click on the tile you want to ping.",
+			position = 10
+	)
+	default Keybind attackPingHotkey()
+	{
+		return Keybind.NOT_SET;
+	}
+
+	@ConfigItem(
+			keyName = "defendPingHotkey",
+			name = "Defend ping hotkey",
+			description = "Key to hold to send a tile ping with a defend symbol.<br>"
+					+ "To ping, hold the ping hotkey down and click on the tile you want to ping.",
+			position = 11
+	)
+	default Keybind defendPingHotkey()
+	{
+		return Keybind.NOT_SET;
 	}
 }

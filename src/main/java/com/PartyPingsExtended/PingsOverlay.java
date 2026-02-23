@@ -2,12 +2,14 @@ package com.PartyPingsExtended;
 
 import java.awt.*;
 import java.awt.image.BufferedImage;
+import java.io.ObjectInputFilter;
 import java.util.Iterator;
 import javax.inject.Inject;
 import net.runelite.api.Client;
 import net.runelite.api.Perspective;
 import net.runelite.api.Point;
 import net.runelite.api.coords.LocalPoint;
+import net.runelite.client.config.Config;
 import net.runelite.client.plugins.party.data.PartyTilePingData;
 import net.runelite.client.ui.overlay.Overlay;
 import net.runelite.client.ui.overlay.OverlayPosition;
@@ -18,6 +20,7 @@ class PingsOverlay extends Overlay
 {
     private final Client client;
     private final PartyPingsExtendedPlugin plugin;
+    private final PartyPingsExtendedConfig config;
     private final BufferedImage ENROUTE;
     private final BufferedImage AVOID;
     private final BufferedImage CAUTION;
@@ -29,10 +32,11 @@ class PingsOverlay extends Overlay
 
 
     @Inject
-    private PingsOverlay(final Client client, final PartyPingsExtendedPlugin plugin)
+    private PingsOverlay(final Client client, final PartyPingsExtendedPlugin plugin, final PartyPingsExtendedConfig config)
     {
         this.client = client;
         this.plugin = plugin;
+        this.config = config;
         setPosition(OverlayPosition.DYNAMIC);
         ENROUTE = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/enroutemark.png");
         AVOID = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/avoidmark.png");
@@ -59,28 +63,27 @@ class PingsOverlay extends Overlay
                     continue;
                 }
 
-                renderPing(graphics, next);
+                if(config.tilePings()){
+                    renderPing(graphics, next);
+                }
+                renderGlyph(graphics, next);
 
                 long elapsedTimeMillis = (System.nanoTime() - next.getCreationTime()) / 1000000;
                 next.setAlpha((int) Math.max(0, 255 - (elapsedTimeMillis / 4)));
             }
         }
-
         return null;
     }
 
     private void renderPing(final Graphics2D graphics, final PartyTilePingDataExtended ping)
     {
         final LocalPoint localPoint = LocalPoint.fromWorld(client, ping.getPoint());
-
         if (localPoint == null)
         {
             return;
         }
 
-
         final Polygon poly = Perspective.getCanvasTilePoly(client, localPoint);
-
         if (poly == null)
         {
             return;
@@ -93,17 +96,16 @@ class PingsOverlay extends Overlay
                 ping.getAlpha());
 
         OverlayUtil.renderPolygon(graphics, poly, color);
-        renderGlyphPing(graphics, localPoint, ping);
     }
-    private void renderGlyphPing(final Graphics2D graphics, final LocalPoint dest, PartyTilePingDataExtended ping)
+    private void renderGlyph(final Graphics2D graphics, final PartyTilePingDataExtended ping)
     {
-        if (dest == null)
+        final LocalPoint localPoint = LocalPoint.fromWorld(client, ping.getPoint());
+        if (localPoint == null)
         {
             return;
         }
 
         BufferedImage Glyph;
-
         switch(ping.getPingType().getPingType())
         {
             case 1:
@@ -128,12 +130,10 @@ class PingsOverlay extends Overlay
                 return;
         }
 
-        Point canvasLoc = Perspective.getCanvasImageLocation(client, dest, Glyph, 120 + (int) (10 * Math.sin(client.getGameCycle() / 6.0)));
-
+        Point canvasLoc = Perspective.getCanvasImageLocation(client, localPoint, Glyph, 120 + (int) (10 * Math.sin(client.getGameCycle() / 6.0)));
         if (canvasLoc != null)
         {
             OverlayUtil.renderImageLocation(graphics, canvasLoc, Glyph);
         }
-
     }
 }
