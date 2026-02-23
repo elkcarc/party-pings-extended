@@ -2,7 +2,6 @@ package com.PartyPingsExtended;
 
 import com.google.inject.Provides;
 import javax.inject.Inject;
-import javax.sound.sampled.*;
 
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
@@ -25,7 +24,6 @@ import net.runelite.client.callback.ClientThread;
 import net.runelite.client.callback.Hooks;
 import net.runelite.client.party.PartyService;
 import net.runelite.client.party.WSClient;
-import net.runelite.client.plugins.party.data.PartyData;
 import net.runelite.client.ui.overlay.OverlayManager;
 import net.runelite.client.util.HotkeyListener;
 import net.runelite.client.input.KeyManager;
@@ -60,7 +58,6 @@ public class PartyPingsExtendedPlugin extends Plugin
 
 	@Inject
 	private PartyPingsExtendedConfig config;
-	protected Clip soundClip;
 
 	@Inject
 	private Notifier notifier;

@@ -2,15 +2,12 @@ package com.PartyPingsExtended;
 
 import java.awt.*;
 import java.awt.image.BufferedImage;
-import java.io.ObjectInputFilter;
 import java.util.Iterator;
 import javax.inject.Inject;
 import net.runelite.api.Client;
 import net.runelite.api.Perspective;
 import net.runelite.api.Point;
 import net.runelite.api.coords.LocalPoint;
-import net.runelite.client.config.Config;
-import net.runelite.client.plugins.party.data.PartyTilePingData;
 import net.runelite.client.ui.overlay.Overlay;
 import net.runelite.client.ui.overlay.OverlayPosition;
 import net.runelite.client.ui.overlay.OverlayUtil;
