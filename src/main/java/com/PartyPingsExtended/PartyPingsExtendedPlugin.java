@@ -249,7 +249,26 @@ public class PartyPingsExtendedPlugin extends Plugin
 			return;
 		}
 
-		PingType pingType = PingType.QUESTION; //todo determine based on key
+		PingType pingType = PingType.ENROUTE;;
+		if (enrouteHotkeyPressed) {
+			pingType = PingType.ENROUTE;
+		}
+		else if (avoidHotkeyPressed) {
+			pingType = PingType.AVOID;
+		}
+		else if (cautionHotkeyPressed) {
+			pingType = PingType.CAUTION;
+		}
+		else if (questionHotkeyPressed) {
+			pingType = PingType.QUESTION;
+		}
+		else if (attackHotkeyPressed) {
+			pingType = PingType.ATTACK;
+		}
+		else if (defendHotkeyPressed) {
+			pingType = PingType.DEFEND;
+		}
+
 
 		event.consume();
 		final TilePingExtended tilePing = new TilePingExtended(selectedSceneTile.getWorldLocation(), this.config.memberColor(), pingType);
@@ -260,7 +279,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 	@Subscribe
 	public void onTilePingExtended(TilePingExtended event)
 	{
-		final Color color = event.getColor() != null ? event.getColor() : Color.RED;
+		final Color color = event.getColor() != null ? event.getColor() : Color.YELLOW;
 		pendingTilePingsExtended.add(new PartyTilePingDataExtended(event.getPoint(), color, event.getPingType()));
 
 		if (config.sounds())
@@ -275,7 +294,4 @@ public class PartyPingsExtendedPlugin extends Plugin
 			clientThread.invoke(() -> client.playSoundEffect(SoundEffectID.SMITH_ANVIL_TONK));
 		}
 	}
-
-
-
 }
