@@ -269,7 +269,6 @@ public class PartyPingsExtendedPlugin extends Plugin
 
 		event.consume();
 		final TilePingExtended tilePing = new TilePingExtended(selectedSceneTile.getWorldLocation(), this.config.memberColor(), pingType);
-		clientThread.invoke(() -> client.playSoundEffect(SoundEffectID.SMITH_ANVIL_TONK));
 		clientThread.invokeLater(() -> party.send(tilePing));
 	}
 
