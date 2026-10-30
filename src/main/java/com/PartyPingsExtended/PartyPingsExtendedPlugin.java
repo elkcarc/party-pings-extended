@@ -24,6 +24,7 @@ import net.runelite.client.callback.ClientThread;
 import net.runelite.client.callback.Hooks;
 import net.runelite.client.party.PartyService;
 import net.runelite.client.party.WSClient;
+import net.runelite.client.plugins.party.messages.TilePing;
 import net.runelite.client.ui.overlay.OverlayManager;
 import net.runelite.client.util.HotkeyListener;
 import net.runelite.client.input.KeyManager;
@@ -77,6 +78,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 	@Override
 	protected void startUp()
 	{
+		wsClient.registerMessage(TilePing.class);
 		wsClient.registerMessage(TilePingExtended.class);
 		keyManager.registerKeyListener(enrouteHotkeyListener);
 		keyManager.registerKeyListener(avoidHotkeyListener);
@@ -90,6 +92,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 	@Override
 	protected void shutDown()
 	{
+		wsClient.unregisterMessage(TilePing.class);
 		wsClient.unregisterMessage(TilePingExtended.class);
 		keyManager.unregisterKeyListener(enrouteHotkeyListener);
 		keyManager.unregisterKeyListener(avoidHotkeyListener);
@@ -268,26 +271,17 @@ public class PartyPingsExtendedPlugin extends Plugin
 
 
 		event.consume();
-		final TilePingExtended tilePing = new TilePingExtended(selectedSceneTile.getWorldLocation(), this.config.memberColor(), pingType);
-		clientThread.invokeLater(() -> party.send(tilePing));
+		final WorldPoint point = selectedSceneTile.getWorldLocation();
+		final PingType finalPingType = pingType;
+		clientThread.invokeLater(() -> {
+			party.send(new TilePing(point));
+			party.send(new TilePingExtended(point, finalPingType));
+		});
 	}
 
 	@Subscribe
 	public void onTilePingExtended(TilePingExtended event)
 	{
-		final Color color = event.getColor() != null ? event.getColor() : Color.YELLOW;
-		pendingTilePingsExtended.add(new PartyTilePingDataExtended(event.getPoint(), color, event.getPingType()));
-
-		if (config.sounds())
-		{
-			WorldPoint point = event.getPoint();
-
-			if (point.getPlane() != client.getPlane() || !WorldPoint.isInScene(client, point.getX(), point.getY()))
-			{
-				return;
-			}
-
-			clientThread.invoke(() -> client.playSoundEffect(SoundEffectID.SMITH_ANVIL_TONK));
-		}
+		pendingTilePingsExtended.add(new PartyTilePingDataExtended(event.getPoint(), event.getPingType()));
 	}
 }

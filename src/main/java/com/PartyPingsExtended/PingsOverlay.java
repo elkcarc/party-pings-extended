@@ -60,9 +60,6 @@ class PingsOverlay extends Overlay
                     continue;
                 }
 
-                if(config.tilePings()){
-                    renderPing(graphics, next);
-                }
                 renderGlyph(graphics, next);
 
                 long elapsedTimeMillis = (System.nanoTime() - next.getCreationTime()) / 1000000;
@@ -72,28 +69,6 @@ class PingsOverlay extends Overlay
         return null;
     }
 
-    private void renderPing(final Graphics2D graphics, final PartyTilePingDataExtended ping)
-    {
-        final LocalPoint localPoint = LocalPoint.fromWorld(client, ping.getPoint());
-        if (localPoint == null)
-        {
-            return;
-        }
-
-        final Polygon poly = Perspective.getCanvasTilePoly(client, localPoint);
-        if (poly == null)
-        {
-            return;
-        }
-
-        final Color color = new Color(
-                ping.getColor().getRed(),
-                ping.getColor().getGreen(),
-                ping.getColor().getBlue(),
-                ping.getAlpha());
-
-        OverlayUtil.renderPolygon(graphics, poly, color);
-    }
     private void renderGlyph(final Graphics2D graphics, final PartyTilePingDataExtended ping)
     {
         final LocalPoint localPoint = LocalPoint.fromWorld(client, ping.getPoint());
