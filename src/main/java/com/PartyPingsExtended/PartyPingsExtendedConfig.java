@@ -80,4 +80,15 @@ public interface PartyPingsExtendedConfig extends Config
 	{
 		return Keybind.NOT_SET;
 	}
+
+	@ConfigItem(
+			keyName = "recolorGlyphs",
+			name = "Match glyph color to sender",
+			description = "Recolor the en-route, avoid, caution and question glyphs to the sending party member's color, so they match the tile highlight. Attack and defend keep their own colors.",
+			position = 7
+	)
+	default boolean recolorGlyphs()
+	{
+		return true;
+	}
 }

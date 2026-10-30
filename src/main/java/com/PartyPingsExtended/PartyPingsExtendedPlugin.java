@@ -17,6 +17,7 @@ import net.runelite.client.plugins.PluginDescriptor;
 import java.awt.*;
 import java.util.*;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 
 import net.runelite.api.Client;
 import net.runelite.client.Notifier;
@@ -24,6 +25,8 @@ import net.runelite.client.callback.ClientThread;
 import net.runelite.client.callback.Hooks;
 import net.runelite.client.party.PartyService;
 import net.runelite.client.party.WSClient;
+import net.runelite.client.party.events.UserJoin;
+import net.runelite.client.plugins.party.messages.MemberColorUpdate;
 import net.runelite.client.plugins.party.messages.TilePing;
 import net.runelite.client.ui.overlay.OverlayManager;
 import net.runelite.client.util.HotkeyListener;
@@ -69,6 +72,10 @@ public class PartyPingsExtendedPlugin extends Plugin
 	@Getter
 	private final List<PartyTilePingDataExtended> pendingTilePingsExtended = Collections.synchronizedList(new ArrayList<>());
 
+	// Sender color per party member id, mirroring the built-in Party plugin:
+	// seeded WHITE on join, updated as members pick a custom color.
+	private final Map<Long, Color> memberColors = new ConcurrentHashMap<>();
+
 	@Provides
 	PartyPingsExtendedConfig provideConfig(ConfigManager configManager)
 	{
@@ -80,6 +87,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 	{
 		wsClient.registerMessage(TilePing.class);
 		wsClient.registerMessage(TilePingExtended.class);
+		wsClient.registerMessage(MemberColorUpdate.class);
 		keyManager.registerKeyListener(enrouteHotkeyListener);
 		keyManager.registerKeyListener(avoidHotkeyListener);
 		keyManager.registerKeyListener(cautionHotkeyListener);
@@ -94,6 +102,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 	{
 		wsClient.unregisterMessage(TilePing.class);
 		wsClient.unregisterMessage(TilePingExtended.class);
+		wsClient.unregisterMessage(MemberColorUpdate.class);
 		keyManager.unregisterKeyListener(enrouteHotkeyListener);
 		keyManager.unregisterKeyListener(avoidHotkeyListener);
 		keyManager.unregisterKeyListener(cautionHotkeyListener);
@@ -280,8 +289,22 @@ public class PartyPingsExtendedPlugin extends Plugin
 	}
 
 	@Subscribe
+	public void onUserJoin(UserJoin event)
+	{
+		memberColors.putIfAbsent(event.getMemberId(), Color.WHITE);
+	}
+
+	@Subscribe
+	public void onMemberColorUpdate(MemberColorUpdate event)
+	{
+		memberColors.put(event.getMemberId(), event.getColor());
+	}
+
+	@Subscribe
 	public void onTilePingExtended(TilePingExtended event)
 	{
-		pendingTilePingsExtended.add(new PartyTilePingDataExtended(event.getPoint(), event.getPingType()));
+		PartyTilePingDataExtended data = new PartyTilePingDataExtended(event.getPoint(), event.getPingType());
+		data.setColor(memberColors.getOrDefault(event.getMemberId(), Color.WHITE));
+		pendingTilePingsExtended.add(data);
 	}
 }

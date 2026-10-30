@@ -2,7 +2,9 @@ package com.PartyPingsExtended;
 
 import java.awt.*;
 import java.awt.image.BufferedImage;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Map;
 import javax.inject.Inject;
 import net.runelite.api.Client;
 import net.runelite.api.Perspective;
@@ -24,6 +26,48 @@ class PingsOverlay extends Overlay
     private final BufferedImage QUESTION;
     private final BufferedImage ATTACK;
     private final BufferedImage DEFEND;
+
+    // Cached tinted glyphs, keyed by "pingType:colorRGB", so a given sender
+    // color is tinted once per glyph instead of on every render frame.
+    private final Map<String, BufferedImage> tintedGlyphs = new HashMap<>();
+
+    // The four semantic glyphs that follow the sender's party color; attack and
+    // defend keep their baked-in image colors.
+    static boolean isRecolorable(PingType type)
+    {
+        switch (type)
+        {
+            case ENROUTE:
+            case AVOID:
+            case CAUTION:
+            case QUESTION:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    // Tint a monochrome glyph to `color` using its alpha channel as a mask.
+    static BufferedImage tint(BufferedImage src, Color color)
+    {
+        int w = src.getWidth();
+        int h = src.getHeight();
+        BufferedImage out = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        for (int y = 0; y < h; y++)
+        {
+            for (int x = 0; x < w; x++)
+            {
+                int argb = src.getRGB(x, y);
+                int a = (argb >>> 24) & 0xFF;
+                if (a == 0)
+                {
+                    continue;
+                }
+                out.setRGB(x, y, ((a << 24) | (color.getRGB() & 0x00FFFFFF)));
+            }
+        }
+        return out;
+    }
 
 
 
@@ -102,10 +146,56 @@ class PingsOverlay extends Overlay
                 return;
         }
 
+        // Tint the four semantic glyphs to the sender's party color so they
+        // match the built-in tile highlight; attack and defend keep their own.
+        if (config.recolorGlyphs() && isRecolorable(ping.getPingType()))
+        {
+            final BufferedImage base = Glyph;
+            final Color c = ping.getColor();
+            final String key = ping.getPingType().getPingType() + ":" + (c.getRGB() & 0xFFFFFF);
+            Glyph = tintedGlyphs.computeIfAbsent(key, k -> tint(base, c));
+        }
+
+        // Fade in lock-step with the built-in tile: bake the ping's alpha into
+        // each pixel so the glyph dims over its ~1 s life instead of popping out.
+        int a = ping.getAlpha();
+        if (a < 255)
+        {
+            Glyph = applyAlpha(Glyph, a);
+        }
+
         Point canvasLoc = Perspective.getCanvasImageLocation(client, localPoint, Glyph, 120 + (int) (10 * Math.sin(client.getGameCycle() / 6.0)));
         if (canvasLoc != null)
         {
             OverlayUtil.renderImageLocation(graphics, canvasLoc, Glyph);
         }
+      }
+
+    // Return a copy of `src` with every pixel's alpha scaled by the global fade
+    // factor, preserving each pixel's own RGB. Fades the glyph without shifting hue.
+    static BufferedImage applyAlpha(BufferedImage src, int alpha)
+    {
+        if (alpha >= 255)
+        {
+          return src;
+        }
+        int w = src.getWidth();
+        int h = src.getHeight();
+        BufferedImage out = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        for (int y = 0; y < h; y++)
+        {
+          for (int x = 0; x < w; x++)
+          {
+              int argb = src.getRGB(x, y);
+              int sa = (argb >>> 24) & 0xFF;
+              if (sa == 0)
+              {
+                  continue;
+              }
+              int fa = (sa * alpha) / 255;
+              out.setRGB(x, y, ((fa << 24) | (argb & 0x00FFFFFF)));
+          }
+        }
+        return out;
     }
 }
