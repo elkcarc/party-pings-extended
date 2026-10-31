@@ -17,15 +17,12 @@ import net.runelite.client.util.ImageUtil;
 
 /**
  * The radial ping menu, drawn at the cursor while the wheel hotkey is held,
- * and only while in a party. The wheel's geometry (hub, slitted rim segments,
- * hover bands) is built once when the wheel opens and stored on the session;
- * every frame only fills the frozen shapes and blits cached glyphs. Inspired
- * by the implementation at https://github.com/oshaunbeck/better-pings-extension
+ * and only while in a party. Inspired by the implementation at https://github.com/oshaunbeck/better-pings-extension
  */
 class PingWheelOverlay extends Overlay
 {
-	// glyph scaling: the outer radius the art is authored for, and the fixed
-	// shrink that makes icons sit inside their segments at any diameter
+	//glyph scaling: the outer radius the art is authored for, and the fixed
+	//shrink that makes icons sit inside their segments at any diameter
 	private static final double ICON_REF_OUTER = 60.0;
 	private static final double ICON_SHRINK = 0.8;
 
@@ -41,7 +38,7 @@ class PingWheelOverlay extends Overlay
 	private final BufferedImage RANGE;
 	private final BufferedImage MELEE;
 
-	// Cached wheel glyphs to display on the wheel, keyed by type:color:scale
+	//Cached wheel glyphs to display on the wheel, keyed by type:color:scale
 	private final java.util.Map<String, BufferedImage> tintedGlyphs = new java.util.concurrent.ConcurrentHashMap<>();
 
 	void clearGlyphCache()
@@ -67,16 +64,14 @@ class PingWheelOverlay extends Overlay
 		MELEE = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/Melee.png");
 	}
 
-	// the glyph for a type: base PNG, tinted to the ping's carried color when
-	// recoloring is enabled (per-client choice), rescaled once per distinct
-	// (type, color, scale) and cached - never per frame
+	//the glyph for a type
 	private BufferedImage icon(final PartyPingsExtendedPlugin.WheelSession session, final PingType type)
 	{
 		final BufferedImage base;
 		switch (type)
 		{
 			case DEFAULT:
-				// the default ping has no glyph
+				//the default ping has no glyph
 				return null;
 			case AVOID:
 				base = AVOID;
@@ -184,7 +179,7 @@ class PingWheelOverlay extends Overlay
 		return out;
 	}
 
-	// Catmull-Rom cubic filter (b = 0, c = 0.5)
+	//catmull-Rom cubic filter (b = 0, c = 0.5)
 	private static double catmullRom(final double x)
 	{
 		final double t = Math.abs(x);
@@ -211,8 +206,7 @@ class PingWheelOverlay extends Overlay
 		return v < 0 ? 0 : (v > 255 ? 255 : v);
 	}
 
-	// the wheel blits geometry that was built once when it opened: no clipping,
-	// subtraction or polygon math runs per frame anymore, only fills and blits
+
 	@Override
 	public Dimension render(Graphics2D graphics)
 	{

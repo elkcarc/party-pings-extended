@@ -45,12 +45,12 @@ import net.runelite.client.input.KeyManager;
 public class PartyPingsExtendedPlugin extends Plugin
 {
 
-	// default wheel geometry (proportions of the default 176 px wheel)
+	// default wheel geometry
 	static final int WHEEL_RADIUS = 88;
 	static final int WHEEL_DEAD_ZONE = 30;
 
 	// border band widths (resting / hover) and the constant slit width between
-	// neighboring rim segments, in wheel pixels
+	// neighboring rim segments, in pixels
 	static final int STROKE_WIDTH = 1;
 	static final float HOVER_STROKE = 2f;
 	static final double GAP_WIDTH = 4.0;
@@ -417,7 +417,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 				if (tile != null && mouse != null && mouse.getX() != -1)
 				{
 					java.awt.Point aim = new java.awt.Point(mouse.getX(), mouse.getY());
-					// all geometry built once, here, at open time
+					//build geometry for the wheel one time, then cache
 					final List<PingType> types = enabledTypes();
 					final double outer = wheelOuter();
 					final double hub = wheelHub();
@@ -494,9 +494,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 		return types;
 	}
 
-	// per-segment geometry frozen at open time: the segment's wedge fill, its
-	// border band at resting width and at hover width, and the wedge's center
-	// angle (for glyph placement). The hub is a segment too (type DEFAULT).
+	// per-segment geometry
 	static class WheelSegment
 	{
 		final PingType type;
@@ -515,10 +513,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 		}
 	}
 
-	// All wheel geometry, built ONCE when the wheel opens (never per frame):
-	// the hub disc and its borders, the enabled rim segments, and the radii
-	// they were built with. Hit-testing uses the same fill areas via contains(),
-	// so visual and selection boundaries cannot drift apart.
+	// all wheel segments together
 	static class WheelGeom
 	{
 		final java.awt.Shape hubFill;
@@ -542,8 +537,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 		}
 	}
 
-	// build every shape the open wheel needs: hub disc + ring borders, then one
-	// wedge per enabled type, constant-width slits via paired half-plane clips
+	// build the wheel
 	static WheelGeom buildGeom(java.awt.Point center, java.util.List<PingType> types, double hub, double inner, double outer)
 	{
 		final int cx = center.x;
@@ -571,8 +565,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 				cx - inner, cy - inner, inner * 2, inner * 2)));
 			if (count > 1)
 			{
-				// constant-width slit: clip the same boundary line in opposite
-				// directions for the two neighbors, each by halfGap
+
 				fill.intersect(halfPlane(cx, cy, centerDeg - 180.0 / count, centerDeg, halfGap));
 				fill.intersect(halfPlane(cx, cy, centerDeg + 180.0 / count, centerDeg, halfGap));
 			}
@@ -584,7 +577,6 @@ public class PartyPingsExtendedPlugin extends Plugin
 		return new WheelGeom(hubCircle, hubBorder, hubBorderHover, segments, hub, inner, outer);
 	}
 
-	// a ring wedge (full ring when single-option) for a segment's border band
 	private static java.awt.geom.Area wedgeRing(int cx, int cy, double outer, double inner, int count, double centerDeg, double inset)
 	{
 		final java.awt.geom.Area ring = new java.awt.geom.Area(new java.awt.geom.Ellipse2D.Double(
@@ -599,15 +591,13 @@ public class PartyPingsExtendedPlugin extends Plugin
 		return ring;
 	}
 
-	// wheel segment selection: hub hit means the quick ping (null); otherwise
-	// the segment whose frozen fill contains the aim; beyond the rim, the angle
-	// fallback keeps the selection tracking the cursor direction
+	//wheel segment selection
 	WheelSegment hoveredSegment(WheelSession session)
 	{
 		final WheelGeom g = session.geom;
 		if (g.hubFill.contains(session.drag))
 		{
-			return null; // the center selects the quick ping
+			return null; //center selects the quick ping
 		}
 		for (WheelSegment seg : g.segments)
 		{
@@ -625,7 +615,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 		return g.segments.get((int) Math.floor((((angle + 90 + segment / 2) % 360) + 360) % 360 / segment));
 	}
 
-	// helper to get even gaps around the rim (inside to outside)
+	//helper to get even gaps around the rim (inside to outside)
 	static java.awt.geom.Area halfPlane(final double cx, final double cy, final double lineDeg,
 									   final double inwardDeg, final double offset)
 	{
