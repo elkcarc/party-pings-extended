@@ -395,8 +395,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 
 		event.consume();
 		final WorldPoint point = selectedSceneTile.getWorldLocation();
-		final PingType finalPingType = pingType;
-		clientThread.invokeLater(() -> sendPing(finalPingType, point));
+		clientThread.invokeLater(() -> sendPing(pingType, point));
 	}
 
 	//ping wheel mode

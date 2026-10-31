@@ -16,10 +16,6 @@ class PartyTilePingDataExtended {
 	@Setter
 	private Color color = Color.YELLOW;
 
-	// the glyph for this ping
-	@Setter
-	private BufferedImage glyph;
-
 	// the faded copy of the glyph
 	@Setter
 	private BufferedImage faded;
