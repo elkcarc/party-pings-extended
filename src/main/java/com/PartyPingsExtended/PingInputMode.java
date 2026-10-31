@@ -1,6 +1,6 @@
 package com.PartyPingsExtended;
 
-/** Which input system sends pings: the per-type hotkey binds or the radial ping wheel. */
+/** Which input system sends pings*/
 public enum PingInputMode
 {
 	HOTKEYS,

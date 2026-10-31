@@ -17,10 +17,7 @@ public interface PartyPingsExtendedConfig extends Config
 	@ConfigItem(
 			keyName = "pingInputMode",
 			name = "Ping input",
-			description = "Choose how pings are sent. 'Ping wheel': the wheel hotkey opens the radial<br>"
-					+ "ping wheel in place of the per-type hotkeys in the 'Hotkey pings' section (which<br>"
-					+ "then never capture their keys). 'Hotkeys': the per-type hotkeys are used and the<br>"
-					+ "wheel is inert.",
+			description = "Choose between individual hotkeys and a ping wheel",
 			position = 1
 	)
 	default PingInputMode pingInputMode()
@@ -30,10 +27,8 @@ public interface PartyPingsExtendedConfig extends Config
 
 	@ConfigItem(
 			keyName = "recolorGlyphs",
-			name = "Match glyph color to sender",
-			description = "Recolor the avoid, caution and question glyphs to the sending party member's color,<br>"
-					+ "so they match the tile highlight. When off, those glyphs keep their original colors.<br>"
-					+ "Per-client: each party member decides this for themselves.",
+			name = "Recolor Glyphs",
+			description = "Recolor the three text Glyphs to match the ping color selected in the party plugin",
 			position = 2
 	)
 	default boolean recolorGlyphs()
@@ -43,11 +38,7 @@ public interface PartyPingsExtendedConfig extends Config
 
 	@ConfigSection(
    			name = "Ping wheel",
-			description = "Single-key radial ping wheel. Hold the wheel hotkey and move the mouse to aim<br>"
-					+ "at an option, release the key to send it to the tile hovered when it opened.<br>"
-					+ "Mouse clicks pass straight through to the game. Only enabled options show<br>"
-					+ "on the rim, including 'Default' (a plain tile ping with no glyph). The quick<br>"
-					+ "ping is carried by the center only - never shown on the rim.",
+			description = "A wheel to select which ping to send",
 			position = 4,
 			closedByDefault = true
 	)
@@ -56,9 +47,7 @@ public interface PartyPingsExtendedConfig extends Config
 	@ConfigItem(
 			keyName = "pingWheelHotkey",
 			name = "Wheel hotkey",
-			description = "Key to hold to open the ping wheel at the cursor. Aim by moving the mouse,<br>"
-					+ "release the key to send. No clicking is involved. Modifier keys<br>"
-					+ "(Alt/Shift/Ctrl) stay fully usable for typing in chat.",
+			description = "Hotkey to show the ping wheel",
 			position = 4,
 			section = "pingWheelSection"
 	)
@@ -70,10 +59,7 @@ public interface PartyPingsExtendedConfig extends Config
 	@ConfigItem(
 			keyName = "quickPing",
 			name = "Quick ping",
-			description = "Ping carried by the wheel's center: releasing the wheel key while the cursor<br>"
-					+ "is in the center sends it, and a glyph type shows its glyph in the center and is<br>"
-					+ "removed from the rim. 'DEFAULT' means the center carries the plain tile ping<br>"
-					+ "(no glyph); DEFAULT is then absent from the rim.",
+			description = "The ping type in the center of the wheel.",
 			position = 5,
 			section = "pingWheelSection"
 	)
@@ -85,7 +71,7 @@ public interface PartyPingsExtendedConfig extends Config
 	@ConfigItem(
 			keyName = "wheelDefault",
 			name = "Default",
-			description = "Show the default option on the wheel: a plain tile ping with no glyph.",
+			description = "A standard ping with no Glyph.",
 			position = 6,
 			section = "pingWheelSection"
 	)
@@ -157,7 +143,7 @@ public interface PartyPingsExtendedConfig extends Config
 	@ConfigItem(
 			keyName = "wheelMage",
 			name = "Mage",
-			description = "Show the mage option on the wheel.",
+			description = "Show the mage pray option on the wheel.",
 			position = 13,
 			section = "pingWheelSection"
 	)
@@ -169,7 +155,7 @@ public interface PartyPingsExtendedConfig extends Config
 	@ConfigItem(
 			keyName = "wheelRange",
 			name = "Range",
-			description = "Show the range option on the wheel.",
+			description = "Show the range pray option on the wheel.",
 			position = 14,
 			section = "pingWheelSection"
 	)
@@ -181,7 +167,7 @@ public interface PartyPingsExtendedConfig extends Config
 	@ConfigItem(
 			keyName = "wheelMelee",
 			name = "Melee",
-			description = "Show the melee option on the wheel.",
+			description = "Show the melee pray option on the wheel.",
 			position = 15,
 			section = "pingWheelSection"
 	)
@@ -192,8 +178,7 @@ public interface PartyPingsExtendedConfig extends Config
 
 	@ConfigSection(
 			name = "Wheel appearance",
-			description = "Colors and transparency of the ping wheel. The center circle and the rim<br>"
-					+ "segments share the background, border and hover colors.",
+			description = "Colors and transparency of the ping wheel.",
 			position = 5,
 			closedByDefault = true
 	)
@@ -255,8 +240,7 @@ public interface PartyPingsExtendedConfig extends Config
 	@ConfigItem(
 			keyName = "wheelDiameter",
 			name = "Wheel diameter",
-			description = "Diameter of the ping wheel in pixels. The hub and rim scale together,<br>"
-					+ "keeping the ring proportions at any size.",
+			description = "Diameter of the ping wheel in pixels. Ranges from 60 to 200.",
 			position = 5,
 			section = "appearanceSection"
 	)
@@ -267,9 +251,7 @@ public interface PartyPingsExtendedConfig extends Config
 
 	@ConfigSection(
 			name = "Hotkey pings",
-			description = "Per-type hold-and-click hotkeys. Only active while 'Hotkeys' is selected as the<br>"
-					+ "ping input; a bind that is not active never captures its key. The 'Default' bind<br>"
-					+ "sends a plain tile ping with no glyph.",
+			description = "Individual hotkeys.",
 			position = 3,
 			closedByDefault = true
 	)
@@ -278,8 +260,7 @@ public interface PartyPingsExtendedConfig extends Config
 	@ConfigItem(
 			keyName = "defaultPingHotkey",
 			name = "Default ping hotkey",
-			description = "Key to hold to send a plain tile ping with no glyph.<br>"
-					+ "To ping, hold the ping hotkey down and click on the tile you want to ping.",
+			description = "A plain tile ping with no glyph.",
 			position = 13,
 			section = "hotkeySection"
 	)
@@ -291,8 +272,7 @@ public interface PartyPingsExtendedConfig extends Config
 	@ConfigItem(
 			keyName = "avoidPingHotkey",
 			name = "Avoid ping hotkey",
-			description = "Key to hold to send a tile ping with an avoid symbol.<br>"
-					+ "To ping, hold the ping hotkey down and click on the tile you want to ping.",
+			description = "A tile ping with an avoid symbol.",
 			position = 15,
 			section = "hotkeySection"
 	)
@@ -304,8 +284,7 @@ public interface PartyPingsExtendedConfig extends Config
 	@ConfigItem(
 			keyName = "cautionPingHotkey",
 			name = "Caution ping hotkey",
-			description = "Key to hold to send a  tile ping with a caution symbol.<br>"
-					+ "To ping, hold the ping hotkey down and click on the tile you want to ping.",
+			description = "A tile ping with a caution symbol.",
 			position = 16,
 			section = "hotkeySection"
 	)
@@ -317,8 +296,7 @@ public interface PartyPingsExtendedConfig extends Config
 	@ConfigItem(
 			keyName = "questionPingHotkey",
 			name = "Question ping hotkey",
-			description = "Key to hold to send a tile ping with a question symbol.<br>"
-					+ "To ping, hold the ping hotkey down and click on the tile you want to ping.",
+			description = "A tile ping with a question mark symbol.",
 			position = 17,
 			section = "hotkeySection"
 	)
@@ -330,8 +308,7 @@ public interface PartyPingsExtendedConfig extends Config
 	@ConfigItem(
 			keyName = "attackPingHotkey",
 		name = "Attack ping hotkey",
-			description = "Key to hold to send a tile ping with an attack symbol.<br>"
-					+ "To ping, hold the ping hotkey down and click on the tile you want to ping.",
+			description = "A tile ping with an attack symbol.",
 			position = 18,
 			section = "hotkeySection"
 	)
@@ -343,8 +320,7 @@ public interface PartyPingsExtendedConfig extends Config
 	@ConfigItem(
 			keyName = "defendPingHotkey",
 			name = "Defend ping hotkey",
-			description = "Key to hold to send a tile ping with a defend symbol.<br>"
-					+ "To ping, hold the ping hotkey down and click on the tile you want to ping.",
+			description = "A tile ping with a defend symbol.",
 			position = 19,
 			section = "hotkeySection"
 	)
@@ -356,8 +332,7 @@ public interface PartyPingsExtendedConfig extends Config
 	@ConfigItem(
 			keyName = "magePingHotkey",
 			name = "Mage ping hotkey",
-			description = "Key to hold to send a tile ping with a mage symbol.<br>"
-					+ "To ping, hold the ping hotkey down and click on the tile you want to ping.",
+			description = "A tile ping with the mage pray symbol.",
 			position = 20,
 			section = "hotkeySection"
 	)
@@ -369,8 +344,7 @@ public interface PartyPingsExtendedConfig extends Config
 	@ConfigItem(
 			keyName = "rangePingHotkey",
 			name = "Range ping hotkey",
-			description = "Key to hold to send a tile ping with a range symbol.<br>"
-					+ "To ping, hold the ping hotkey down and click on the tile you want to ping.",
+			description = "A tile ping with the range pray symbol.",
 			position = 21,
 			section = "hotkeySection"
 	)
@@ -382,8 +356,7 @@ public interface PartyPingsExtendedConfig extends Config
 	@ConfigItem(
 			keyName = "meleePingHotkey",
 			name = "Melee ping hotkey",
-			description = "Key to hold to send a tile ping with a melee symbol.<br>"
-					+ "To ping, hold the ping hotkey down and click on the tile you want to ping.",
+			description = "A tile ping with the melee pray symbol.",
 			position = 22,
 			section = "hotkeySection"
 	)

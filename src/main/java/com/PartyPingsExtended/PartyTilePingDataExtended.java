@@ -6,32 +6,24 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 
-/**
- * One in-flight ping: the tile it marks, the type (for the glyph), and the
- * sender's color. The glyph is tinted once when the ping is created; the fade
- * copies are cached per alpha step by the overlay, never rebuilt per frame.
- */
+
 @RequiredArgsConstructor
 @Getter
 class PartyTilePingDataExtended {
 	private final net.runelite.api.coords.WorldPoint point;
 	private final PingType pingType;
-	// the sender's party member color (or YELLOW until known), used to recolor
-	// the glyph so it matches the built-in tile highlight.
+	// the sender's party member color (or YELLOW until known)
 	@Setter
 	private Color color = Color.YELLOW;
 
-	// the glyph for this ping, already tinted (or the base image when this
-	// client has recoloring off)
+	// the glyph for this ping
 	@Setter
 	private BufferedImage glyph;
 
-	// the faded copy of the glyph, recomputed once per fade step (see the
-	// overlay); stored on the ping so no cross-ping cache can go stale
+	// the faded copy of the glyph
 	@Setter
 	private BufferedImage faded;
 
-	// which fade step `faded` currently holds (alpha / 16); -1 = none yet
 	@Setter
 	private int step = -1;
 

@@ -9,7 +9,6 @@ import net.runelite.api.Client;
 import net.runelite.api.Perspective;
 import net.runelite.api.coords.LocalPoint;
 import net.runelite.client.ui.overlay.Overlay;
-import net.runelite.client.ui.overlay.OverlayLayer;
 import net.runelite.client.ui.overlay.OverlayPosition;
 import net.runelite.client.ui.overlay.OverlayUtil;
 import net.runelite.client.util.ImageUtil;
@@ -29,9 +28,6 @@ class PingsOverlay extends Overlay
     private final BufferedImage RANGE;
     private final BufferedImage MELEE;
 
-    // the sender's color drives the tint decision; the three semantic glyphs
-    // follow it while attack, defend, mage, range and melee keep their
-    // baked-in image colors
     static boolean isRecolorable(PingType type)
     {
         switch (type)
@@ -96,11 +92,7 @@ class PingsOverlay extends Overlay
             return;
         }
 
-        // glyph re-derived from (type, sender color, CURRENT recolorGlyphs
-        // setting) whenever the fade reaches a new step (16 steps per ping),
-        // and stored on the ping itself: no cross-ping cache exists, so a
-        // settings change applies to in-flight pings on their next step and
-        // disappears entirely when the ping expires
+
         final int step = ping.getAlpha() / 16;
         if (step != ping.getStep())
         {
@@ -150,13 +142,11 @@ class PingsOverlay extends Overlay
         }
     }
 
-    // no-op for the scene overlay: it derives each ping's glyph at render time
-    // from the live setting, so there is no shared cache to invalidate
     void clearGlyphCache()
     {
     }
 
-    static BufferedImage tint(BufferedImage src, Color color)
+    static BufferedImage tint(BufferedImage src, Color color) //recolor based on party color helper
     {
         int w = src.getWidth();
         int h = src.getHeight();
@@ -177,7 +167,7 @@ class PingsOverlay extends Overlay
         return out;
     }
 
-    static BufferedImage applyAlpha(BufferedImage src, int alpha)
+    static BufferedImage applyAlpha(BufferedImage src, int alpha) //fade out helper
     {
         if (alpha >= 255)
         {

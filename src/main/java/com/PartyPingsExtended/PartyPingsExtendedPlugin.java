@@ -40,21 +40,17 @@ import net.runelite.client.input.KeyManager;
 @PluginDescriptor(
 	name = "Party Pings Extended"
 )
-// depends on the built-in Party plugin so its public module (which provides
-// PartyPluginService, the source of each member's color) is installed into
-// this plugin's injector
+// depends on the built-in Party plugin for the tile highlight and sound component
 @PluginDependency(PartyPlugin.class)
 public class PartyPingsExtendedPlugin extends Plugin
 {
 
-	// default wheel geometry: outer radius and hub radius (px). The live values
-	// come from the wheelDiameter config scaled against these defaults, so the
-	// hub/rim proportion stays constant at any diameter.
+	// default wheel geometry
 	static final int WHEEL_RADIUS = 88;
 	static final int WHEEL_DEAD_ZONE = 30;
 
 	// guards against a single gesture ever double-firing; not a spam limiter
-	private static final long SEND_COOLDOWN_MS = 150;
+	private static final long SEND_COOLDOWN_MS = 10;
 
 	@Inject
 	private Client client;
@@ -92,16 +88,9 @@ public class PartyPingsExtendedPlugin extends Plugin
 	@Getter
 	private final List<PartyTilePingDataExtended> pendingTilePingsExtended = Collections.synchronizedList(new ArrayList<>());
 
-	// The built-in Party plugin's data service: the authoritative source for a
-	// member's color (what the built-in tile highlight is drawn with). Optional:
-	// null when the Party plugin is not installed here, in which case glyph
-	// tinting falls back to yellow. (com.google.inject.Inject so the missing
-	// binding is skipped instead of failing plugin injection.)
 	@com.google.inject.Inject(optional = true)
 	private PartyPluginService partyPluginService;
 
-	// The open ping wheel, or null when closed. Written on the AWT thread,
-	// read on the client thread by the overlay.
 	@Getter
 	private volatile WheelSession wheelSession;
 
@@ -154,17 +143,13 @@ public class PartyPingsExtendedPlugin extends Plugin
 		pendingTilePingsExtended.clear();
 	}
 
-	// drop all cached tinted/faded glyph images
 	void clearGlyphCache()
 	{
 		pingsOverlay.clearGlyphCache();
 		pingWheelOverlay.clearGlyphCache();
 	}
 
-	// config changes apply immediately: cached glyphs were built under the old
-	// settings, so a change to recolorGlyphs (or any appearance option that
-	// ends up feeding a tint) must invalidate them. Pings created after the
-	// change pick up the new setting when their glyph is prepared.
+
 	@Subscribe
 	public void onConfigChanged(ConfigChanged event)
 	{
@@ -190,12 +175,9 @@ public class PartyPingsExtendedPlugin extends Plugin
 			rangeHotkeyPressed = false;
 			meleeHotkeyPressed = false;
 			defaultHotkeyPressed = false;
-			// close the wheel without pinging
 			wheelSession = null;
 		}
 	}
-
-	// ----- per-type hotkey mode (inactive while the wheel is enabled) -----
 
 	private final HotkeyListener defaultHotkeyListener = new HotkeyListener(() -> config.defaultPingHotkey())
 	{
@@ -204,7 +186,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 		{
 			if (wheelActive())
 		{
-				return; // wheel mode: stay passive so this bind never eats a key
+				return;
 			}
 			super.keyPressed(e);
 		}
@@ -240,7 +222,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 		{
 			if (wheelActive())
 			{
-				return; // wheel mode: stay passive so this bind never eats a key
+				return;
 			}
 			super.keyPressed(e);
 		}
@@ -276,7 +258,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 		{
 			if (wheelActive())
 			{
-				return; // wheel mode: stay passive so this bind never eats a key
+				return;
 			}
 			super.keyPressed(e);
 		}
@@ -312,7 +294,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 		{
 			if (wheelActive())
 			{
-				return; // wheel mode: stay passive so this bind never eats a key
+				return;
 			}
 			super.keyPressed(e);
 		}
@@ -348,7 +330,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 		{
 			if (wheelActive())
 			{
-				return; // wheel mode: stay passive so this bind never eats a key
+				return;
 			}
 			super.keyPressed(e);
 		}
@@ -384,7 +366,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 		{
 			if (wheelActive())
 			{
-				return; // wheel mode: stay passive so this bind never eats a key
+				return;
 			}
 			super.keyPressed(e);
 		}
@@ -420,7 +402,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 		{
 			if (wheelActive())
 			{
-				return; // wheel mode: stay passive so this bind never eats a key
+				return;
 			}
 			super.keyPressed(e);
 		}
@@ -456,7 +438,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 		{
 			if (wheelActive())
 			{
-				return; // wheel mode: stay passive so this bind never eats a key
+				return;
 			}
 			super.keyPressed(e);
 		}
@@ -492,7 +474,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 		{
 			if (wheelActive())
 			{
-				return; // wheel mode: stay passive so this bind never eats a key
+				return;
 			}
 			super.keyPressed(e);
 		}
@@ -521,29 +503,25 @@ public class PartyPingsExtendedPlugin extends Plugin
 	};
 	private boolean meleeHotkeyPressed = false;
 
-	// Whether the wheel currently owns input. The wheel hotkey and the per-type
-	// binds consult this so a bind that is not in use never captures its key.
+
 	boolean wheelActive()
 	{
 		return config.pingInputMode() == PingInputMode.PING_WHEEL;
 	}
 
-	// Pings only work in a party: no wheel, no glyph, no send outside one.
 	boolean inParty()
 	{
 		return party.isInParty();
 	}
 
-	// My current party member color: exactly the value the built-in Party plugin
-	// colors the tile highlight with (its per-member PartyMemberData color), so
-	// glyph and tile always match. YELLOW when unknown (no Party plugin data).
+	//get self color for recoloring glyphs
 	Color myColor()
 	{
 		final PartyMember local = party.getLocalMember();
 		return memberColor(local != null ? local.getMemberId() : -1L);
 	}
 
-	// The built-in plugin's recorded color for a member (YELLOW when unknown).
+	//built-in plugin's color for a member (YELLOW when unknown).
 	Color memberColor(final long memberId)
 	{
 		if (partyPluginService != null)
@@ -560,7 +538,6 @@ public class PartyPingsExtendedPlugin extends Plugin
 	@Subscribe
 	public void onMenuOptionClicked(MenuOptionClicked event)
 	{
-		// wheel mode owns input: no per-type bind is active then
 		if (wheelActive())
 		{
 			return;
@@ -635,8 +612,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 		clientThread.invokeLater(() -> sendPing(finalPingType, point));
 	}
 
-	// ----- ping wheel mode: hold the key, aim with the mouse, release to send -----
-
+	//ping wheel mode
 	private final HotkeyListener wheelHotkeyListener = new HotkeyListener(() -> config.pingWheelHotkey())
 	{
 		@Override
@@ -644,7 +620,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 		{
 			if (!wheelActive())
 			{
-				return; // per-type mode: the wheel bind must never eat a key
+				return;
 			}
 			super.keyPressed(e);
 		}
@@ -664,8 +640,6 @@ public class PartyPingsExtendedPlugin extends Plugin
 		{
 			if (wheelSession == null && client.getGameState() == GameState.LOGGED_IN)
 			{
-				// the wheel always opens when enabled, whatever the quick ping
-				// selection is
 				Tile tile = client.getSelectedSceneTile();
 				net.runelite.api.Point mouse = client.getMouseCanvasPosition();
 				if (tile != null && mouse != null && mouse.getX() != -1)
@@ -683,10 +657,9 @@ public class PartyPingsExtendedPlugin extends Plugin
 			if (session != null)
 			{
 				wheelSession = null;
-
-				PingType selected = hoveredType(session);				if (selected == null)
+				PingType selected = hoveredType(session);
+				if (selected == null) // aimed at the center, send quick ping
 				{
-					// aimed at the center: the configured quick ping
 					selected = config.quickPing();
 				}
 				if (selected != null)
@@ -695,20 +668,16 @@ public class PartyPingsExtendedPlugin extends Plugin
 				}
 			}
 		}
-
 		@Override
 		public void focusLost()
 		{
-			// alt-tab and the like: close the wheel without pinging
 			wheelSession = null;
 			super.focusLost();
 		}
 	};
 
 	// The rim options currently enabled in config, in enum order. The wheel
-	// divides itself evenly among exactly these. The quick ping, when it is a
-	// glyph type, is excluded (it shows in the center instead) and DEFAULT
-	// never appears on the rim at all.
+	// divides itself evenly among exactly these. The quick ping is excluded (it shows in the center instead)
 	java.util.List<PingType> enabledTypes()
 	{
 		java.util.List<PingType> types = new ArrayList<>();
@@ -752,17 +721,12 @@ public class PartyPingsExtendedPlugin extends Plugin
 		return types;
 	}
 
-	/**
-	 * Maps the session's current aim to one of its enabled segments; null inside
-	 * the dead center (the caller resolves that to the quick ping). Segments are
-	 * centered top-first, continuing clockwise, divided evenly among the
-	 * enabled types in enum order.
-	 */
+	//wheel segment selection handler
 	PingType hoveredType(WheelSession session)
 	{
 		if (aimIsCenter(session) || session.types.isEmpty())
 		{
-			return null; // the center selects the quick ping (resolved by the caller)
+			return null; // the center selects the quick ping
 		}
 
 		final java.awt.Point drag = session.drag;
@@ -771,26 +735,22 @@ public class PartyPingsExtendedPlugin extends Plugin
 
 		final List<PingType> types = session.types;
 		final double segment = 360.0 / types.size();
-		final double angle = Math.toDegrees(Math.atan2(dy, dx)); // 0 = east, clockwise positive
+		final double angle = Math.toDegrees(Math.atan2(dy, dx));
 		final int index = (int) Math.floor((((angle + 90 + segment / 2) % 360) + 360) % 360 / segment);
 		return types.get(index);
 	}
 
-	// live geometry: the wheel's outer edge radius, from the configured diameter
 	double wheelOuter()
 	{
 		return config.wheelDiameter() / 2.0;
 	}
 
-	// the hub (center circle) edge radius: the default hub/outer proportion
-	// (30/88), scaled to the configured diameter. Also the hit-test radius for
-	// "aimed at the center".
+	// center circle edge radius
 	double wheelHub()
 	{
 		return wheelOuter() * WHEEL_DEAD_ZONE / (double) WHEEL_RADIUS;
 	}
 
-	// true when the session's current aim lies inside the hub edge
 	boolean aimIsCenter(WheelSession session)
 	{
 		final java.awt.Point drag = session.drag;
@@ -804,7 +764,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 	{
 		final java.awt.Point center;
 		final WorldPoint target;
-		final List<PingType> types; // enabled rim options, enum order
+		final List<PingType> types;
 		volatile java.awt.Point drag;
 
 		WheelSession(java.awt.Point center, WorldPoint target, List<PingType> types)
@@ -816,7 +776,6 @@ public class PartyPingsExtendedPlugin extends Plugin
 		}
 	}
 
-	// ----- shared send path -----
 
 	private void sendPing(PingType type, WorldPoint point)
 	{
@@ -840,10 +799,8 @@ public class PartyPingsExtendedPlugin extends Plugin
 			return;
 		}
 
-		// the color the built-in plugin will draw the tile highlight with, baked
-		// into the extended message so every client resolves the exact same
-		// color; each client applies it locally only if its recolorGlyphs is on
-		final Color color = myColor();
+
+		final Color color = myColor(); //getting the color for recoloring glyphs
 		final PartyTilePingDataExtended data = new PartyTilePingDataExtended(point, type);
 		data.setColor(color);
 		pendingTilePingsExtended.add(data);
@@ -855,7 +812,6 @@ public class PartyPingsExtendedPlugin extends Plugin
     @Subscribe
     public void onUserPart(UserPart event)
     {
-		// drop in-flight pings: outside a party, nothing renders
 		wheelSession = null;
 		pendingTilePingsExtended.clear();
     }
@@ -866,13 +822,10 @@ public class PartyPingsExtendedPlugin extends Plugin
 		final PartyMember local = party.getLocalMember();
 		if (local != null && event.getMemberId() == local.getMemberId())
 		{
-			// our own ping echoed back; it was already shown on send
+
 			return;
 		}
 
-		// render with the color carried in the message, which is the sender's
-		// own built-in-plugin color at send time; tinting is decided per-client
-		// by the recolorGlyphs setting at render time
 		PartyTilePingDataExtended data = new PartyTilePingDataExtended(event.getPoint(), event.getPingType());
 		data.setColor(event.getColor());
 		pendingTilePingsExtended.add(data);
