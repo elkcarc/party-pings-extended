@@ -7,6 +7,7 @@ import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
 import net.runelite.client.config.ConfigSection;
 import net.runelite.client.config.Keybind;
+import net.runelite.client.config.Range;
 
 @ConfigGroup(PartyPingsExtendedConfig.GROUP)
 public interface PartyPingsExtendedConfig extends Config
@@ -89,7 +90,7 @@ public interface PartyPingsExtendedConfig extends Config
 	)
 	default boolean wheelDefault()
 	{
-		return false;
+		return true;
 	}
 
 	@ConfigItem(
@@ -259,6 +260,20 @@ public interface PartyPingsExtendedConfig extends Config
 	default Color wheelHoverBorder()
 	{
 		return new Color(255, 255, 255, 128);
+	}
+
+	@Range(min = 60, max = 200)
+	@ConfigItem(
+			keyName = "wheelDiameter",
+			name = "Wheel diameter",
+			description = "Diameter of the ping wheel in pixels. The hub and rim scale together,<br>"
+					+ "keeping the ring proportions at any size.",
+			position = 5,
+			section = "appearanceSection"
+	)
+	default int wheelDiameter()
+	{
+		return 120;
 	}
 
 	@ConfigSection(

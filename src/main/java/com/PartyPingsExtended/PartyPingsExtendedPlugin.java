@@ -47,7 +47,9 @@ import net.runelite.client.input.KeyManager;
 public class PartyPingsExtendedPlugin extends Plugin
 {
 
-	// wheel geometry: outer radius and the central dead zone where no type is hovered
+	// default wheel geometry: outer radius and hub radius (px). The live values
+	// come from the wheelDiameter config scaled against these defaults, so the
+	// hub/rim proportion stays constant at any diameter.
 	static final int WHEEL_RADIUS = 88;
 	static final int WHEEL_DEAD_ZONE = 30;
 
@@ -168,7 +170,8 @@ public class PartyPingsExtendedPlugin extends Plugin
 	@Subscribe
 	public void onConfigChanged(ConfigChanged event)
 	{
-		if (PartyPingsExtendedConfig.GROUP.equals(event.getGroup()) && "recolorGlyphs".equals(event.getKey()))
+		if (PartyPingsExtendedConfig.GROUP.equals(event.getGroup())
+			&& ("recolorGlyphs".equals(event.getKey()) || "wheelDiameter".equals(event.getKey())))
 		{
 			clearGlyphCache();
 		}
@@ -722,8 +725,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 			{
 				wheelSession = null;
 
-				PingType selected = hoveredType(session);
-				if (selected == null)
+				PingType selected = hoveredType(session);				if (selected == null)
 				{
 					// aimed at the center: the configured quick ping
 					selected = config.quickPing();
@@ -797,33 +799,50 @@ public class PartyPingsExtendedPlugin extends Plugin
 
 	/**
 	 * Maps the session's current aim to one of its enabled segments; null inside
-	 * the dead zone. Segments are centered top-first, continuing clockwise,
-	 * divided evenly among the enabled types in enum order.
+	 * the dead center (the caller resolves that to the quick ping). Segments are
+	 * centered top-first, continuing clockwise, divided evenly among the
+	 * enabled types in enum order.
 	 */
-	/**
-	 * Maps the session's current aim to one of its segments. Aiming at the
-	 * center returns DEFAULT (the quick ping), so the center highlights and
-	 * behaves like a segment of its own; null only when the rim is empty.
-	 */
-	static PingType hoveredType(WheelSession session)
+	PingType hoveredType(WheelSession session)
 	{
-		final java.awt.Point drag = session.drag;
-		final int dx = drag.x - session.center.x;
-		final int dy = drag.y - session.center.y;
-		if (dx * dx + dy * dy < WHEEL_DEAD_ZONE * WHEEL_DEAD_ZONE)
+		if (aimIsCenter(session) || session.types.isEmpty())
 		{
 			return null; // the center selects the quick ping (resolved by the caller)
 		}
-		if (session.types.isEmpty())
-		{
-			return null;
-		}
+
+		final java.awt.Point drag = session.drag;
+		final int dx = drag.x - session.center.x;
+		final int dy = drag.y - session.center.y;
 
 		final List<PingType> types = session.types;
 		final double segment = 360.0 / types.size();
 		final double angle = Math.toDegrees(Math.atan2(dy, dx)); // 0 = east, clockwise positive
 		final int index = (int) Math.floor((((angle + 90 + segment / 2) % 360) + 360) % 360 / segment);
 		return types.get(index);
+	}
+
+	// live geometry: the wheel's outer edge radius, from the configured diameter
+	double wheelOuter()
+	{
+		return config.wheelDiameter() / 2.0;
+	}
+
+	// the hub (center circle) edge radius: the default hub/outer proportion
+	// (30/88), scaled to the configured diameter. Also the hit-test radius for
+	// "aimed at the center".
+	double wheelHub()
+	{
+		return wheelOuter() * WHEEL_DEAD_ZONE / (double) WHEEL_RADIUS;
+	}
+
+	// true when the session's current aim lies inside the hub edge
+	boolean aimIsCenter(WheelSession session)
+	{
+		final java.awt.Point drag = session.drag;
+		final double dx = drag.x - session.center.x;
+		final double dy = drag.y - session.center.y;
+		final double hub = wheelHub();
+		return dx * dx + dy * dy < hub * hub;
 	}
 
 	static class WheelSession

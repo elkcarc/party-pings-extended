@@ -27,8 +27,8 @@ import net.runelite.client.util.ImageUtil;
  * from the inner edge of the donut to the outer edge. Colors and transparency
  * come from the appearance config. Icons are the same glyph PNGs the scene
  * overlay uses, tinted to the sender's party color (carried in the ping
- * message) when this client has glyph recoloring enabled, so the wheel ships
- * no extra art.
+ * message) when this client has glyph recoloring enabled, and scaled with the
+ * configured wheel diameter, so the wheel ships no extra art.
  */
 class PingWheelOverlay extends Overlay
 {
@@ -37,6 +37,10 @@ class PingWheelOverlay extends Overlay
 	// constant pixel width of the slit between neighboring segments, measured
 	// perpendicular to the slit at every radius
 	private static final double GAP_WIDTH = 4.0;
+	// glyph scaling: the outer radius the art is authored for, and the shrink
+	// that makes icons sit inside their segments (0.95, then a further 30%)
+	private static final double ICON_REF_OUTER = 60.0;
+	private static final double ICON_SHRINK = 1;
 
 	private final net.runelite.api.Client client;
 	private final PartyPingsExtendedPlugin plugin;
@@ -51,8 +55,8 @@ class PingWheelOverlay extends Overlay
 	private final BufferedImage RANGE;
 	private final BufferedImage MELEE;
 
-	// Cached tinted wheel glyphs, keyed by "pingType:colorRGB", so my color is
-	// tinted once per glyph instead of on every render frame.
+	// Cached wheel glyphs, keyed by "type:colorRGB:scale" — tinted and rescaled
+	// once per distinct combination instead of on every render frame.
 	private final java.util.Map<String, BufferedImage> tintedGlyphs = new java.util.concurrent.ConcurrentHashMap<>();
 
 	// drop all cached tinted glyphs
@@ -119,17 +123,93 @@ class PingWheelOverlay extends Overlay
 				return null;
 		}
 
-		// tint the glyph to the sender's party color only when this client has
-		// recoloring enabled (per-client choice); attack, defend, mage, range
-		// and melee keep their baked-in colors everywhere, so they do here too
-		if (config.recolorGlyphs() && PingsOverlay.isRecolorable(type))
+		// one cache entry per (type, color-or-none, scale): the glyph is tinted
+		// and rescaled once per distinct combination, never per frame.
+		// Recoloring is a per-client choice (attack, defend, mage, range and
+		// melee keep their baked-in colors everywhere, so they do here too).
+		final boolean recolor = config.recolorGlyphs() && PingsOverlay.isRecolorable(type);
+		final Color c = recolor ? plugin.myColor() : null;
+		// glyphs scale with the wheel, shrunk ~5% so they sit inside their
+		// segment; measured against the default wheel so the default diameter
+		// renders at 95% of the native art
+		final double scale = plugin.wheelOuter() / ICON_REF_OUTER * ICON_SHRINK;
+		final String key = type.name() + ":" + (c == null ? "-" : Integer.toString(c.getRGB() & 0xFFFFFF))
+			+ ":" + Math.round(scale * 100);
+		return tintedGlyphs.computeIfAbsent(key, k ->
 		{
-			final Color c = plugin.myColor();
-			final String key = type.name() + ":" + (c.getRGB() & 0xFFFFFF);
-			final BufferedImage b = base;
-			return tintedGlyphs.computeIfAbsent(key, k -> PingsOverlay.tint(b, c));
+			final BufferedImage tinted = c != null ? PingsOverlay.tint(base, c) : base;
+			// at the default diameter scale is exactly 1.0: native pixels, no resample
+			return scale == 1.0 ? tinted : scaleImage(tinted, scale);
+		});
+	}
+
+	// rescale a glyph keeping pixel-art crisp: upscales by replicating pixels at
+	// an integer factor, downscales by averaging integer-blocks, each at the
+	// integer ratio nearest the requested scale (exact fractional resampling of
+	// raster art cannot be sharp; integer ratios resample without soft edges)
+	private static BufferedImage scaleImage(final BufferedImage src, final double s)
+	{
+		if (s >= 1.0)
+		{
+			final int u = Math.max(1, (int) Math.round(s)); // upscale factor
+			if (u == 1)
+			{
+				return src;
+			}
+			final int w = src.getWidth();
+			final int h = src.getHeight();
+			final BufferedImage out = new BufferedImage(w * u, h * u, BufferedImage.TYPE_INT_ARGB);
+			for (int y = 0; y < h; y++)
+			{
+				for (int x = 0; x < w; x++)
+				{
+					final int argb = src.getRGB(x, y);
+					for (int dy = 0; dy < u; dy++)
+					{
+						for (int dx = 0; dx < u; dx++)
+						{
+							out.setRGB(x * u + dx, y * u + dy, argb);
+						}
+					}
+				}
+			}
+			return out;
 		}
-		return base;
+
+		final int r = Math.max(2, (int) Math.round(1.0 / s)); // downscale ratio
+		final int w = src.getWidth() / r;
+		final int h = src.getHeight() / r;
+		final BufferedImage out = new BufferedImage(Math.max(1, w), Math.max(1, h), BufferedImage.TYPE_INT_ARGB);
+		for (int y = 0; y < h; y++)
+		{
+			for (int x = 0; x < w; x++)
+			{
+				// box-average the r×r block on every channel, straight (not
+				// premultiplied): simple, deterministic, and the art is flat
+				// color on transparency so channel bleeding across the block
+				// edge is negligible at these ratios
+				int aSum = 0, rSum = 0, gSum = 0, bSum = 0;
+				for (int dy = 0; dy < r; dy++)
+				{
+					for (int dx = 0; dx < r; dx++)
+					{
+						final int argb = src.getRGB(x * r + dx, y * r + dy);
+						aSum += (argb >>> 24) & 0xFF;
+						rSum += ((argb >>> 16) & 0xFF);
+						gSum += ((argb >>> 8) & 0xFF);
+						bSum += (argb & 0xFF);
+					}
+				}
+				final int n = r * r;
+				final int aAvg = aSum / n;
+				if (aAvg == 0)
+				{
+					continue;
+				}
+				out.setRGB(x, y, (aAvg << 24) | (((rSum / n) & 0xFF) << 16) | (((gSum / n) & 0xFF) << 8) | ((bSum / n) & 0xFF));
+			}
+		}
+		return out;
 	}
 
 	@Override
@@ -168,18 +248,17 @@ class PingWheelOverlay extends Overlay
 		final int cx = session.center.x;
 		final int cy = session.center.y;
 		final List<PingType> types = session.types;
-		final PingType hovered = PartyPingsExtendedPlugin.hoveredType(session);
-		final double outer = PartyPingsExtendedPlugin.WHEEL_RADIUS;
-		final double inner = PartyPingsExtendedPlugin.WHEEL_DEAD_ZONE + 4;
+		final PingType hovered = plugin.hoveredType(session);
+		final double outer = plugin.wheelOuter();
+		// rim inner edge: one gap out from the hub, like every other gap
+		final double inner = plugin.wheelHub() + GAP_WIDTH;
 
 		// the center circle carries the quick ping's glyph when one is set (the
 		// quick type never shows on the rim); aiming at the center selects the
 		// quick ping, so it highlights like a segment. Its edge sits GAP_WIDTH
 		// away from the rim's inner edge, like every other gap
 		final PingType quick = config.quickPing();
-		final java.awt.Point aim = session.drag;
-		final boolean centerHovered = (aim.x - cx) * (aim.x - cx) + (aim.y - cy) * (aim.y - cy)
-			<= PartyPingsExtendedPlugin.WHEEL_DEAD_ZONE * PartyPingsExtendedPlugin.WHEEL_DEAD_ZONE;
+		final boolean centerHovered = plugin.aimIsCenter(session);
 		final double hub = inner - GAP_WIDTH;
 		final double hubBw = centerHovered ? HOVER_STROKE : STROKE_WIDTH;
 		final Ellipse2D hubCircle = new Ellipse2D.Double(cx - hub, cy - hub, hub * 2, hub * 2);
@@ -195,7 +274,7 @@ class PingWheelOverlay extends Overlay
 		final BufferedImage quickGlyph = icon(quick);
 		if (quickGlyph != null)
 		{
-			// drawn at native pixel size, unscaled, exactly like a scene ping
+			// wheel glyphs scale with the wheel (cached, resampled once)
 			graphics.drawImage(quickGlyph, cx - quickGlyph.getWidth() / 2, cy - quickGlyph.getHeight() / 2, null);
 		}
 
@@ -264,7 +343,7 @@ class PingWheelOverlay extends Overlay
 			final BufferedImage glyph = icon(type);
 			if (glyph != null)
 			{
-				// drawn at native pixel size, unscaled, exactly like a scene ping
+				// wheel glyphs scale with the wheel (cached, resampled once)
 				graphics.drawImage(glyph, ix - glyph.getWidth() / 2, iy - glyph.getHeight() / 2, null);
 			}
 		}
