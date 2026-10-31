@@ -6,15 +6,14 @@ package com.PartyPingsExtended;
  */
 public enum PingType {
 	DEFAULT(0),
-	ENROUTE(1),
-	AVOID(2),
-	CAUTION(3),
-	QUESTION(4),
-	ATTACK(5),
-	DEFEND(6),
-	MAGE(7),
-	RANGE(8),
-	MELEE(9);
+	AVOID(1),
+	CAUTION(2),
+	QUESTION(3),
+	ATTACK(4),
+	DEFEND(5),
+	MAGE(6),
+	RANGE(7),
+	MELEE(8);
 
 	private final int pingtype;
 

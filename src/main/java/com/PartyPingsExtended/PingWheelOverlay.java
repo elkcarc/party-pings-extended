@@ -37,15 +37,14 @@ class PingWheelOverlay extends Overlay
 	// constant pixel width of the slit between neighboring segments, measured
 	// perpendicular to the slit at every radius
 	private static final double GAP_WIDTH = 4.0;
-	// glyph scaling: the outer radius the art is authored for, and the shrink
-	// that makes icons sit inside their segments (0.95, then a further 30%)
+	// glyph scaling: the outer radius the art is authored for, and the fixed
+	// shrink that makes icons sit inside their segments at any diameter
 	private static final double ICON_REF_OUTER = 60.0;
-	private static final double ICON_SHRINK = 1;
+	private static final double ICON_SHRINK = 0.8;
 
 	private final net.runelite.api.Client client;
 	private final PartyPingsExtendedPlugin plugin;
 	private final PartyPingsExtendedConfig config;
-	private final BufferedImage ENROUTE;
 	private final BufferedImage AVOID;
 	private final BufferedImage CAUTION;
 	private final BufferedImage QUESTION;
@@ -73,7 +72,6 @@ class PingWheelOverlay extends Overlay
 		this.config = config;
 		setPosition(OverlayPosition.DYNAMIC);
 		setLayer(OverlayLayer.ALWAYS_ON_TOP);
-		ENROUTE = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/enroutemark.png");
 		AVOID = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/avoidmark.png");
 		CAUTION = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/exclamationmark.png");
 		QUESTION = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/questionmark.png");
@@ -92,9 +90,6 @@ class PingWheelOverlay extends Overlay
 			case DEFAULT:
 				// the default ping has no glyph
 				return null;
-			case ENROUTE:
-				base = ENROUTE;
-				break;
 			case AVOID:
 				base = AVOID;
 				break;
@@ -129,9 +124,7 @@ class PingWheelOverlay extends Overlay
 		// melee keep their baked-in colors everywhere, so they do here too).
 		final boolean recolor = config.recolorGlyphs() && PingsOverlay.isRecolorable(type);
 		final Color c = recolor ? plugin.myColor() : null;
-		// glyphs scale with the wheel, shrunk ~5% so they sit inside their
-		// segment; measured against the default wheel so the default diameter
-		// renders at 95% of the native art
+		// glyphs scale with the wheel, shrunk by the fixed factor at every diameter
 		final double scale = plugin.wheelOuter() / ICON_REF_OUTER * ICON_SHRINK;
 		final String key = type.name() + ":" + (c == null ? "-" : Integer.toString(c.getRGB() & 0xFFFFFF))
 			+ ":" + Math.round(scale * 100);
@@ -143,73 +136,111 @@ class PingWheelOverlay extends Overlay
 		});
 	}
 
-	// rescale a glyph keeping pixel-art crisp: upscales by replicating pixels at
-	// an integer factor, downscales by averaging integer-blocks, each at the
-	// integer ratio nearest the requested scale (exact fractional resampling of
-	// raster art cannot be sharp; integer ratios resample without soft edges)
+	// bicubic rescale of a glyph at the exact requested scale (no ratio
+	// snapping): separable 4x4 Catmull-Rom, ported from the same filter as
+	// RuneLite's gpu plugin bicubic.glsl (catmull_rom: b=0, c=0.5). Color is
+	// weighted by alpha so fully-transparent texels don't drag edges toward
+	// black; channels clamp to [0,255] since cubic filters can overshoot.
 	private static BufferedImage scaleImage(final BufferedImage src, final double s)
 	{
-		if (s >= 1.0)
-		{
-			final int u = Math.max(1, (int) Math.round(s)); // upscale factor
-			if (u == 1)
-			{
-				return src;
-			}
-			final int w = src.getWidth();
-			final int h = src.getHeight();
-			final BufferedImage out = new BufferedImage(w * u, h * u, BufferedImage.TYPE_INT_ARGB);
-			for (int y = 0; y < h; y++)
-			{
-				for (int x = 0; x < w; x++)
-				{
-					final int argb = src.getRGB(x, y);
-					for (int dy = 0; dy < u; dy++)
-					{
-						for (int dx = 0; dx < u; dx++)
-						{
-							out.setRGB(x * u + dx, y * u + dy, argb);
-						}
-					}
-				}
-			}
-			return out;
-		}
+		final int w = src.getWidth();
+		final int h = src.getHeight();
+		final int dw = Math.max(1, (int) Math.round(w * s));
+		final int dh = Math.max(1, (int) Math.round(h * s));
 
-		final int r = Math.max(2, (int) Math.round(1.0 / s)); // downscale ratio
-		final int w = src.getWidth() / r;
-		final int h = src.getHeight() / r;
-		final BufferedImage out = new BufferedImage(Math.max(1, w), Math.max(1, h), BufferedImage.TYPE_INT_ARGB);
+		// horizontal pass: for every SOURCE row, each destination column
+		// gathers a weighted sum of the 4 source pixels around it. Channels are
+		// stored premultiplied by alpha (acc[0]=r, acc[1]=g, acc[2]=b, acc[3]=a
+		// - explicit channels, not shift arithmetic on the packed int).
+		final double[] mid = new double[h * dw * 4];
 		for (int y = 0; y < h; y++)
 		{
-			for (int x = 0; x < w; x++)
+			for (int x = 0; x < dw; x++)
 			{
-				// box-average the r×r block on every channel, straight (not
-				// premultiplied): simple, deterministic, and the art is flat
-				// color on transparency so channel bleeding across the block
-				// edge is negligible at these ratios
-				int aSum = 0, rSum = 0, gSum = 0, bSum = 0;
-				for (int dy = 0; dy < r; dy++)
+				final double cxPix = (x + 0.5) / s - 0.5;
+				final int ix = (int) Math.floor(cxPix);
+				double wSum = 0;
+				double rSum = 0, gSum = 0, bSum = 0, aSum = 0;
+				for (int k = -1; k <= 2; k++)
 				{
-					for (int dx = 0; dx < r; dx++)
-					{
-						final int argb = src.getRGB(x * r + dx, y * r + dy);
-						aSum += (argb >>> 24) & 0xFF;
-						rSum += ((argb >>> 16) & 0xFF);
-						gSum += ((argb >>> 8) & 0xFF);
-						bSum += (argb & 0xFF);
-					}
+					final double wt = catmullRom(cxPix - (ix + k));
+					wSum += wt;
+					final int argb = src.getRGB(clampIx(ix + k, w - 1), y);
+					final int a = (argb >>> 24) & 0xFF;
+					rSum += wt * (((argb >>> 16) & 0xFF) * a / 255);
+					gSum += wt * (((argb >>> 8) & 0xFF) * a / 255);
+					bSum += wt * ((argb & 0xFF) * a / 255);
+					aSum += wt * a;
 				}
-				final int n = r * r;
-				final int aAvg = aSum / n;
-				if (aAvg == 0)
+				final int base = (y * dw + x) * 4;
+				mid[base] = rSum;
+				mid[base + 1] = gSum;
+				mid[base + 2] = bSum;
+				mid[base + 3] = aSum;
+			}
+		}
+
+		// vertical pass: sum the stored per-row columns over 4 source rows
+		final BufferedImage out = new BufferedImage(dw, dh, BufferedImage.TYPE_INT_ARGB);
+		for (int y = 0; y < dh; y++)
+		{
+			final double cyPix = (y + 0.5) / s - 0.5;
+			final int iy = (int) Math.floor(cyPix);
+			for (int x = 0; x < dw; x++)
+			{
+				double rSum = 0, gSum = 0, bSum = 0, aSum = 0;
+				for (int k = -1; k <= 2; k++)
 				{
-					continue;
+					final double wt = catmullRom(cyPix - (iy + k));
+					final int base = (clampIx(iy + k, h - 1) * dw + x) * 4;
+					rSum += wt * mid[base];
+					gSum += wt * mid[base + 1];
+					bSum += wt * mid[base + 2];
+					aSum += wt * mid[base + 3];
 				}
-				out.setRGB(x, y, (aAvg << 24) | (((rSum / n) & 0xFF) << 16) | (((gSum / n) & 0xFF) << 8) | ((bSum / n) & 0xFF));
+				// the filter sums to 1, so the weighted sums are already the
+				// filtered premultiplied values
+				final double aAvg = aSum;
+				if (aAvg <= 0.5)
+				{
+					continue; // fully transparent
+				}
+				final int a = clamp255((int) Math.round(aAvg));
+				// un-premultiply the averaged premultiplied channels
+				final int ru = clamp255((int) Math.round(clamp255((int) Math.round(rSum)) * 255.0 / aAvg));
+				final int gu = clamp255((int) Math.round(clamp255((int) Math.round(gSum)) * 255.0 / aAvg));
+				final int bu = clamp255((int) Math.round(clamp255((int) Math.round(bSum)) * 255.0 / aAvg));
+				out.setRGB(x, y, (a << 24) | (ru << 16) | (gu << 8) | bu);
 			}
 		}
 		return out;
+	}
+
+	// Catmull-Rom cubic filter (b = 0, c = 0.5), matching bicubic.glsl
+	private static double catmullRom(final double x)
+	{
+		final double t = Math.abs(x);
+		final double t2 = t * t;
+		final double t3 = t2 * t;
+		if (t < 1)
+		{
+			return 1.5 * t3 - 2.5 * t2 + 1.0;
+		}
+		else if (t < 2)
+		{
+			return -0.5 * t3 + 2.5 * t2 - 4.0 * t + 2.0;
+		}
+		return 0.0;
+	}
+
+	private static int clampIx(final int v, final int max)
+	{
+		return v < 0 ? 0 : (v > max ? max : v);
+	}
+
+	private static int clamp255(final int v)
+	{
+		return v < 0 ? 0 : (v > 255 ? 255 : v);
 	}
 
 	@Override

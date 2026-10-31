@@ -20,7 +20,6 @@ class PingsOverlay extends Overlay
     private final Client client;
     private final PartyPingsExtendedPlugin plugin;
     private final PartyPingsExtendedConfig config;
-    private final BufferedImage ENROUTE;
     private final BufferedImage AVOID;
     private final BufferedImage CAUTION;
     private final BufferedImage QUESTION;
@@ -30,14 +29,13 @@ class PingsOverlay extends Overlay
     private final BufferedImage RANGE;
     private final BufferedImage MELEE;
 
-    // the sender's color drives the tint decision; the four semantic glyphs
+    // the sender's color drives the tint decision; the three semantic glyphs
     // follow it while attack, defend, mage, range and melee keep their
     // baked-in image colors
     static boolean isRecolorable(PingType type)
     {
         switch (type)
         {
-            case ENROUTE:
             case AVOID:
             case CAUTION:
             case QUESTION:
@@ -54,7 +52,6 @@ class PingsOverlay extends Overlay
         this.plugin = plugin;
         this.config = config;
         setPosition(OverlayPosition.DYNAMIC);
-        ENROUTE = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/enroutemark.png");
         AVOID = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/avoidmark.png");
         CAUTION = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/exclamationmark.png");
         QUESTION = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/questionmark.png");
@@ -132,8 +129,6 @@ class PingsOverlay extends Overlay
     {
         switch (type)
         {
-            case ENROUTE:
-                return ENROUTE;
             case AVOID:
                 return AVOID;
             case CAUTION:
@@ -151,7 +146,7 @@ class PingsOverlay extends Overlay
             case MELEE:
                 return MELEE;
             default:
-                return ENROUTE;
+                return AVOID;
         }
     }
 

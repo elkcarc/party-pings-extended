@@ -119,7 +119,6 @@ public class PartyPingsExtendedPlugin extends Plugin
 		wsClient.registerMessage(TilePing.class);
 		wsClient.registerMessage(TilePingExtended.class);
 		keyManager.registerKeyListener(defaultHotkeyListener);
-		keyManager.registerKeyListener(enrouteHotkeyListener);
 		keyManager.registerKeyListener(avoidHotkeyListener);
 		keyManager.registerKeyListener(cautionHotkeyListener);
 		keyManager.registerKeyListener(questionHotkeyListener);
@@ -139,7 +138,6 @@ public class PartyPingsExtendedPlugin extends Plugin
 		wsClient.unregisterMessage(TilePing.class);
 		wsClient.unregisterMessage(TilePingExtended.class);
 		keyManager.unregisterKeyListener(defaultHotkeyListener);
-		keyManager.unregisterKeyListener(enrouteHotkeyListener);
 		keyManager.unregisterKeyListener(avoidHotkeyListener);
 		keyManager.unregisterKeyListener(cautionHotkeyListener);
 		keyManager.unregisterKeyListener(questionHotkeyListener);
@@ -182,7 +180,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 	{
 		if (!focusChanged.isFocused())
 		{
-			enrouteHotkeyPressed = false;
+			defaultHotkeyPressed = false;
 			avoidHotkeyPressed = false;
 			cautionHotkeyPressed = false;
 			questionHotkeyPressed = false;
@@ -204,7 +202,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 		@Override
 		public void keyPressed(java.awt.event.KeyEvent e)
 		{
-			if (config.pingWheelEnabled())
+			if (wheelActive())
 		{
 				return; // wheel mode: stay passive so this bind never eats a key
 			}
@@ -214,7 +212,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 		@Override
 		public void keyTyped(java.awt.event.KeyEvent e)
 		{
-			if (config.pingWheelEnabled())
+			if (wheelActive())
 			{
 				return;
 			}
@@ -235,48 +233,12 @@ public class PartyPingsExtendedPlugin extends Plugin
 	};
 	private boolean defaultHotkeyPressed = false;
 
-	private final HotkeyListener enrouteHotkeyListener = new HotkeyListener(() -> config.enroutePingHotkey())
-	{
-		@Override
-		public void keyPressed(java.awt.event.KeyEvent e)
-		{
-			if (config.pingWheelEnabled())
-			{
-				return; // wheel mode: stay passive so this bind never eats a key
-			}
-			super.keyPressed(e);
-		}
-
-		@Override
-		public void keyTyped(java.awt.event.KeyEvent e)
-		{
-			if (config.pingWheelEnabled())
-			{
-				return;
-			}
-			super.keyTyped(e);
-		}
-
-		@Override
-		public void hotkeyPressed()
-		{
-			enrouteHotkeyPressed = true;
-		}
-
-		@Override
-		public void hotkeyReleased()
-		{
-			enrouteHotkeyPressed = false;
-		}
-	};
-	private boolean enrouteHotkeyPressed = false;
-
 	private final HotkeyListener avoidHotkeyListener = new HotkeyListener(() -> config.avoidPingHotkey())
 	{
 		@Override
 		public void keyPressed(java.awt.event.KeyEvent e)
 		{
-			if (config.pingWheelEnabled())
+			if (wheelActive())
 			{
 				return; // wheel mode: stay passive so this bind never eats a key
 			}
@@ -286,7 +248,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 		@Override
 		public void keyTyped(java.awt.event.KeyEvent e)
 		{
-			if (config.pingWheelEnabled())
+			if (wheelActive())
 			{
 				return;
 			}
@@ -312,7 +274,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 		@Override
 		public void keyPressed(java.awt.event.KeyEvent e)
 		{
-			if (config.pingWheelEnabled())
+			if (wheelActive())
 			{
 				return; // wheel mode: stay passive so this bind never eats a key
 			}
@@ -322,7 +284,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 		@Override
 		public void keyTyped(java.awt.event.KeyEvent e)
 		{
-			if (config.pingWheelEnabled())
+			if (wheelActive())
 			{
 				return;
 			}
@@ -348,7 +310,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 		@Override
 		public void keyPressed(java.awt.event.KeyEvent e)
 		{
-			if (config.pingWheelEnabled())
+			if (wheelActive())
 			{
 				return; // wheel mode: stay passive so this bind never eats a key
 			}
@@ -358,7 +320,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 		@Override
 		public void keyTyped(java.awt.event.KeyEvent e)
 		{
-			if (config.pingWheelEnabled())
+			if (wheelActive())
 			{
 				return;
 			}
@@ -384,7 +346,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 		@Override
 		public void keyPressed(java.awt.event.KeyEvent e)
 		{
-			if (config.pingWheelEnabled())
+			if (wheelActive())
 			{
 				return; // wheel mode: stay passive so this bind never eats a key
 			}
@@ -394,7 +356,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 		@Override
 		public void keyTyped(java.awt.event.KeyEvent e)
 		{
-			if (config.pingWheelEnabled())
+			if (wheelActive())
 			{
 				return;
 			}
@@ -420,7 +382,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 		@Override
 		public void keyPressed(java.awt.event.KeyEvent e)
 		{
-			if (config.pingWheelEnabled())
+			if (wheelActive())
 			{
 				return; // wheel mode: stay passive so this bind never eats a key
 			}
@@ -430,7 +392,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 		@Override
 		public void keyTyped(java.awt.event.KeyEvent e)
 		{
-			if (config.pingWheelEnabled())
+			if (wheelActive())
 			{
 				return;
 			}
@@ -456,7 +418,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 		@Override
 		public void keyPressed(java.awt.event.KeyEvent e)
 		{
-			if (config.pingWheelEnabled())
+			if (wheelActive())
 			{
 				return; // wheel mode: stay passive so this bind never eats a key
 			}
@@ -466,7 +428,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 		@Override
 		public void keyTyped(java.awt.event.KeyEvent e)
 		{
-			if (config.pingWheelEnabled())
+			if (wheelActive())
 			{
 				return;
 			}
@@ -492,7 +454,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 		@Override
 		public void keyPressed(java.awt.event.KeyEvent e)
 		{
-			if (config.pingWheelEnabled())
+			if (wheelActive())
 			{
 				return; // wheel mode: stay passive so this bind never eats a key
 			}
@@ -502,7 +464,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 		@Override
 		public void keyTyped(java.awt.event.KeyEvent e)
 		{
-			if (config.pingWheelEnabled())
+			if (wheelActive())
 			{
 				return;
 			}
@@ -528,7 +490,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 		@Override
 		public void keyPressed(java.awt.event.KeyEvent e)
 		{
-			if (config.pingWheelEnabled())
+			if (wheelActive())
 			{
 				return; // wheel mode: stay passive so this bind never eats a key
 			}
@@ -538,7 +500,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 		@Override
 		public void keyTyped(java.awt.event.KeyEvent e)
 		{
-			if (config.pingWheelEnabled())
+			if (wheelActive())
 			{
 				return;
 			}
@@ -563,7 +525,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 	// binds consult this so a bind that is not in use never captures its key.
 	boolean wheelActive()
 	{
-		return config.pingWheelEnabled();
+		return config.pingInputMode() == PingInputMode.PING_WHEEL;
 	}
 
 	// Pings only work in a party: no wheel, no glyph, no send outside one.
@@ -604,7 +566,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 			return;
 		}
 
-		boolean hotkeyPressed = defaultHotkeyPressed || enrouteHotkeyPressed || avoidHotkeyPressed || cautionHotkeyPressed || questionHotkeyPressed
+		boolean hotkeyPressed = defaultHotkeyPressed || avoidHotkeyPressed || cautionHotkeyPressed || questionHotkeyPressed
 			|| attackHotkeyPressed || defendHotkeyPressed || mageHotkeyPressed || rangeHotkeyPressed || meleeHotkeyPressed;
 
 		if (!hotkeyPressed || client.isMenuOpen())
@@ -641,9 +603,6 @@ public class PartyPingsExtendedPlugin extends Plugin
 		PingType pingType = PingType.DEFAULT;
 		if (defaultHotkeyPressed) {
 			pingType = PingType.DEFAULT;
-		}
-		else if (enrouteHotkeyPressed) {
-			pingType = PingType.ENROUTE;
 		}
 		else if (avoidHotkeyPressed) {
 			pingType = PingType.AVOID;
@@ -683,7 +642,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 		@Override
 		public void keyPressed(java.awt.event.KeyEvent e)
 		{
-			if (!config.pingWheelEnabled())
+			if (!wheelActive())
 			{
 				return; // per-type mode: the wheel bind must never eat a key
 			}
@@ -693,7 +652,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 		@Override
 		public void keyTyped(java.awt.event.KeyEvent e)
 		{
-			if (!config.pingWheelEnabled())
+			if (!wheelActive())
 			{
 				return;
 			}
@@ -757,10 +716,6 @@ public class PartyPingsExtendedPlugin extends Plugin
 		if (config.wheelDefault() && quick != PingType.DEFAULT)
 		{
 			types.add(PingType.DEFAULT);
-		}
-		if (config.wheelEnroute() && quick != PingType.ENROUTE)
-		{
-			types.add(PingType.ENROUTE);
 		}
 		if (config.wheelAvoid())
 		{

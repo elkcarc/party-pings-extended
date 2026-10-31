@@ -15,22 +15,23 @@ public interface PartyPingsExtendedConfig extends Config
 	String GROUP = "Party Pings Extended";
 
 	@ConfigItem(
-			keyName = "pingWheelEnabled",
-			name = "Use ping wheel",
-			description = "Choose how pings are sent. When on, the wheel hotkey opens the radial ping wheel<br>"
-					+ "in place of the per-type hotkeys in the 'Hotkey pings' section (which then never<br>"
-					+ "capture their keys). When off, the per-type hotkeys are used and the wheel is inert.",
+			keyName = "pingInputMode",
+			name = "Ping input",
+			description = "Choose how pings are sent. 'Ping wheel': the wheel hotkey opens the radial<br>"
+					+ "ping wheel in place of the per-type hotkeys in the 'Hotkey pings' section (which<br>"
+					+ "then never capture their keys). 'Hotkeys': the per-type hotkeys are used and the<br>"
+					+ "wheel is inert.",
 			position = 1
 	)
-	default boolean pingWheelEnabled()
+	default PingInputMode pingInputMode()
 	{
-		return false;
+		return PingInputMode.HOTKEYS;
 	}
 
 	@ConfigItem(
 			keyName = "recolorGlyphs",
 			name = "Match glyph color to sender",
-			description = "Recolor the en-route, avoid, caution and question glyphs to the sending party member's color,<br>"
+			description = "Recolor the avoid, caution and question glyphs to the sending party member's color,<br>"
 					+ "so they match the tile highlight. When off, those glyphs keep their original colors.<br>"
 					+ "Per-client: each party member decides this for themselves.",
 			position = 2
@@ -47,7 +48,7 @@ public interface PartyPingsExtendedConfig extends Config
 					+ "Mouse clicks pass straight through to the game. Only enabled options show<br>"
 					+ "on the rim, including 'Default' (a plain tile ping with no glyph). The quick<br>"
 					+ "ping is carried by the center only - never shown on the rim.",
-			position = 3,
+			position = 4,
 			closedByDefault = true
 	)
 	String pingWheelSection = "pingWheelSection";
@@ -89,18 +90,6 @@ public interface PartyPingsExtendedConfig extends Config
 			section = "pingWheelSection"
 	)
 	default boolean wheelDefault()
-	{
-		return true;
-	}
-
-	@ConfigItem(
-			keyName = "wheelEnroute",
-			name = "En-route",
-			description = "Show the en-route option on the wheel.",
-			position = 7,
-			section = "pingWheelSection"
-	)
-	default boolean wheelEnroute()
 	{
 		return true;
 	}
@@ -205,7 +194,7 @@ public interface PartyPingsExtendedConfig extends Config
 			name = "Wheel appearance",
 			description = "Colors and transparency of the ping wheel. The center circle and the rim<br>"
 					+ "segments share the background, border and hover colors.",
-			position = 4,
+			position = 5,
 			closedByDefault = true
 	)
 	String appearanceSection = "appearanceSection";
@@ -273,15 +262,15 @@ public interface PartyPingsExtendedConfig extends Config
 	)
 	default int wheelDiameter()
 	{
-		return 120;
+		return 130;
 	}
 
 	@ConfigSection(
 			name = "Hotkey pings",
-			description = "Per-type hold-and-click hotkeys. Only active while the ping wheel is disabled;<br>"
-					+ "a bind that is not active never captures its key. The 'Default' bind sends a<br>"
-					+ "plain tile ping with no glyph.",
-			position = 5,
+			description = "Per-type hold-and-click hotkeys. Only active while 'Hotkeys' is selected as the<br>"
+					+ "ping input; a bind that is not active never captures its key. The 'Default' bind<br>"
+					+ "sends a plain tile ping with no glyph.",
+			position = 3,
 			closedByDefault = true
 	)
 	String hotkeySection = "hotkeySection";
@@ -295,19 +284,6 @@ public interface PartyPingsExtendedConfig extends Config
 			section = "hotkeySection"
 	)
 	default Keybind defaultPingHotkey()
-	{
-		return Keybind.NOT_SET;
-	}
-
-	@ConfigItem(
-			keyName = "enroutePingHotkey",
-			name = "En-route ping hotkey",
-			description = "Key to hold to send a tile ping with an en-route symbol.<br>"
-					+ "To ping, hold the ping hotkey down and click on the tile you want to ping.",
-			position = 14,
-			section = "hotkeySection"
-	)
-	default Keybind enroutePingHotkey()
 	{
 		return Keybind.NOT_SET;
 	}
