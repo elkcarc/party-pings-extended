@@ -29,7 +29,9 @@ public interface PartyPingsExtendedConfig extends Config
 	@ConfigItem(
 			keyName = "recolorGlyphs",
 			name = "Match glyph color to sender",
-			description = "Recolor the en-route, avoid, caution and question glyphs to the sending party member's color, so they match the tile highlight. Attack and defend keep their own colors.",
+			description = "Recolor the en-route, avoid, caution and question glyphs to the sending party member's color,<br>"
+					+ "so they match the tile highlight. When off, those glyphs keep their original colors.<br>"
+					+ "Per-client: each party member decides this for themselves.",
 			position = 2
 	)
 	default boolean recolorGlyphs()
@@ -38,7 +40,7 @@ public interface PartyPingsExtendedConfig extends Config
 	}
 
 	@ConfigSection(
-			name = "Ping wheel",
+ 			name = "Ping wheel",
 			description = "Single-key radial ping wheel. Hold the wheel hotkey and move the mouse to aim<br>"
 					+ "at an option, release the key to send it to the tile hovered when it opened.<br>"
 					+ "Mouse clicks pass straight through to the game. Only enabled options show<br>"

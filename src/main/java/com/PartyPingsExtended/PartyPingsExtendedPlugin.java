@@ -11,13 +11,15 @@ import net.runelite.api.events.FocusChanged;
 import net.runelite.api.events.MenuOptionClicked;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.plugins.Plugin;
+import net.runelite.client.plugins.PluginDependency;
 import net.runelite.client.plugins.PluginDescriptor;
+import net.runelite.client.plugins.party.PartyPlugin;
 
 import java.awt.*;
 import java.util.*;
 import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
 
 import net.runelite.api.Client;
 import net.runelite.client.Notifier;
@@ -26,9 +28,9 @@ import net.runelite.client.callback.Hooks;
 import net.runelite.client.party.PartyMember;
 import net.runelite.client.party.PartyService;
 import net.runelite.client.party.WSClient;
-import net.runelite.client.party.events.UserJoin;
 import net.runelite.client.party.events.UserPart;
-import net.runelite.client.plugins.party.messages.MemberColorUpdate;
+import net.runelite.client.plugins.party.PartyPluginService;
+import net.runelite.client.plugins.party.data.PartyMemberData;
 import net.runelite.client.plugins.party.messages.TilePing;
 import net.runelite.client.ui.overlay.OverlayManager;
 import net.runelite.client.util.HotkeyListener;
@@ -38,6 +40,10 @@ import net.runelite.client.input.KeyManager;
 @PluginDescriptor(
 	name = "Party Pings Extended"
 )
+// depends on the built-in Party plugin so its public module (which provides
+// PartyPluginService, the source of each member's color) is installed into
+// this plugin's injector
+@PluginDependency(PartyPlugin.class)
 public class PartyPingsExtendedPlugin extends Plugin
 {
 
@@ -84,9 +90,13 @@ public class PartyPingsExtendedPlugin extends Plugin
 	@Getter
 	private final List<PartyTilePingDataExtended> pendingTilePingsExtended = Collections.synchronizedList(new ArrayList<>());
 
-	// Sender color per party member id, mirroring the built-in Party plugin:
-	// seeded WHITE on join, updated as members pick a custom color.
-	private final Map<Long, Color> memberColors = new ConcurrentHashMap<>();
+	// The built-in Party plugin's data service: the authoritative source for a
+	// member's color (what the built-in tile highlight is drawn with). Optional:
+	// null when the Party plugin is not installed here, in which case glyph
+	// tinting falls back to yellow. (com.google.inject.Inject so the missing
+	// binding is skipped instead of failing plugin injection.)
+	@com.google.inject.Inject(optional = true)
+	private PartyPluginService partyPluginService;
 
 	// The open ping wheel, or null when closed. Written on the AWT thread,
 	// read on the client thread by the overlay.
@@ -106,7 +116,6 @@ public class PartyPingsExtendedPlugin extends Plugin
 	{
 		wsClient.registerMessage(TilePing.class);
 		wsClient.registerMessage(TilePingExtended.class);
-		wsClient.registerMessage(MemberColorUpdate.class);
 		keyManager.registerKeyListener(enrouteHotkeyListener);
 		keyManager.registerKeyListener(avoidHotkeyListener);
 		keyManager.registerKeyListener(cautionHotkeyListener);
@@ -126,7 +135,6 @@ public class PartyPingsExtendedPlugin extends Plugin
 	{
 		wsClient.unregisterMessage(TilePing.class);
 		wsClient.unregisterMessage(TilePingExtended.class);
-		wsClient.unregisterMessage(MemberColorUpdate.class);
 		keyManager.unregisterKeyListener(enrouteHotkeyListener);
 		keyManager.unregisterKeyListener(avoidHotkeyListener);
 		keyManager.unregisterKeyListener(cautionHotkeyListener);
@@ -142,7 +150,6 @@ public class PartyPingsExtendedPlugin extends Plugin
 		clearGlyphCache();
 		wheelSession = null;
 		pendingTilePingsExtended.clear();
-		memberColors.clear();
 	}
 
 	// drop all cached tinted/faded glyph images
@@ -150,6 +157,19 @@ public class PartyPingsExtendedPlugin extends Plugin
 	{
 		pingsOverlay.clearGlyphCache();
 		pingWheelOverlay.clearGlyphCache();
+	}
+
+	// config changes apply immediately: cached glyphs were built under the old
+	// settings, so a change to recolorGlyphs (or any appearance option that
+	// ends up feeding a tint) must invalidate them. Pings created after the
+	// change pick up the new setting when their glyph is prepared.
+	@Subscribe
+	public void onConfigChanged(ConfigChanged event)
+	{
+		if (PartyPingsExtendedConfig.GROUP.equals(event.getGroup()) && "recolorGlyphs".equals(event.getKey()))
+		{
+			clearGlyphCache();
+		}
 	}
 
 	@Subscribe
@@ -510,12 +530,27 @@ public class PartyPingsExtendedPlugin extends Plugin
 		return party.isInParty();
 	}
 
-	// My current party member color (WHITE until known), for tinting the wheel's
-	// glyphs the same way the scene overlay tints scene glyphs.
+	// My current party member color: exactly the value the built-in Party plugin
+	// colors the tile highlight with (its per-member PartyMemberData color), so
+	// glyph and tile always match. YELLOW when unknown (no Party plugin data).
 	Color myColor()
 	{
 		final PartyMember local = party.getLocalMember();
-		return memberColors.getOrDefault(local != null ? local.getMemberId() : -1L, Color.WHITE);
+		return memberColor(local != null ? local.getMemberId() : -1L);
+	}
+
+	// The built-in plugin's recorded color for a member (YELLOW when unknown).
+	Color memberColor(final long memberId)
+	{
+		if (partyPluginService != null)
+		{
+			final PartyMemberData data = partyPluginService.getPartyData(memberId);
+			if (data != null)
+			{
+				return data.getColor();
+			}
+		}
+		return Color.YELLOW;
 	}
 
 	@Subscribe
@@ -787,43 +822,29 @@ public class PartyPingsExtendedPlugin extends Plugin
 			return;
 		}
 
-		// render it locally right away; the party echo is skipped by id in
-		// onTilePingExtended, so this stays the single source for local display
-		final PartyMember local = party.getLocalMember();
-		final Color color = memberColors.getOrDefault(local != null ? local.getMemberId() : -1L, Color.WHITE);
+		// the color the built-in plugin will draw the tile highlight with, baked
+		// into the extended message so every client resolves the exact same
+		// color; each client applies it locally only if its recolorGlyphs is on
+		final Color color = myColor();
 		final PartyTilePingDataExtended data = new PartyTilePingDataExtended(point, type);
 		data.setColor(color);
-		data.setGlyph(pingsOverlay.prepareGlyph(type, color));
 		pendingTilePingsExtended.add(data);
 
 		party.send(new TilePing(point));
-		party.send(new TilePingExtended(point, type));
-	}
+		party.send(new TilePingExtended(point, type, color));
+    }
 
-	@Subscribe
-	public void onUserJoin(UserJoin event)
-	{
-		memberColors.putIfAbsent(event.getMemberId(), Color.WHITE);
-	}
-
-	@Subscribe
-	public void onMemberColorUpdate(MemberColorUpdate event)
-	{
-		memberColors.put(event.getMemberId(), event.getColor());
-	}
-
-	@Subscribe
-	public void onUserPart(UserPart event)
-	{
-		memberColors.remove(event.getMemberId());
-		wheelSession = null;
+    @Subscribe
+    public void onUserPart(UserPart event)
+    {
 		// drop in-flight pings: outside a party, nothing renders
+		wheelSession = null;
 		pendingTilePingsExtended.clear();
-	}
+    }
 
-	@Subscribe
-	public void onTilePingExtended(TilePingExtended event)
-	{
+    @Subscribe
+    public void onTilePingExtended(TilePingExtended event)
+    {
 		final PartyMember local = party.getLocalMember();
 		if (local != null && event.getMemberId() == local.getMemberId())
 		{
@@ -831,10 +852,11 @@ public class PartyPingsExtendedPlugin extends Plugin
 			return;
 		}
 
+		// render with the color carried in the message, which is the sender's
+		// own built-in-plugin color at send time; tinting is decided per-client
+		// by the recolorGlyphs setting at render time
 		PartyTilePingDataExtended data = new PartyTilePingDataExtended(event.getPoint(), event.getPingType());
-		final Color senderColor = memberColors.getOrDefault(event.getMemberId(), Color.WHITE);
-		data.setColor(senderColor);
-		data.setGlyph(pingsOverlay.prepareGlyph(event.getPingType(), senderColor));
+		data.setColor(event.getColor());
 		pendingTilePingsExtended.add(data);
-	}
+    }
 }

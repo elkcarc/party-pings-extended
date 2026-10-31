@@ -16,14 +16,24 @@ import lombok.Setter;
 class PartyTilePingDataExtended {
 	private final net.runelite.api.coords.WorldPoint point;
 	private final PingType pingType;
-	// the sender's party member color (or WHITE until known), used to recolor
+	// the sender's party member color (or YELLOW until known), used to recolor
 	// the glyph so it matches the built-in tile highlight.
 	@Setter
-	private Color color = Color.WHITE;
+	private Color color = Color.YELLOW;
 
-	// the glyph for this ping, already tinted
+	// the glyph for this ping, already tinted (or the base image when this
+	// client has recoloring off)
 	@Setter
 	private BufferedImage glyph;
+
+	// the faded copy of the glyph, recomputed once per fade step (see the
+	// overlay); stored on the ping so no cross-ping cache can go stale
+	@Setter
+	private BufferedImage faded;
+
+	// which fade step `faded` currently holds (alpha / 16); -1 = none yet
+	@Setter
+	private int step = -1;
 
 	// fade state: starts at 255, decays with elapsed time in the overlay
 	@Setter

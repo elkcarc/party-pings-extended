@@ -24,8 +24,9 @@ import net.runelite.client.util.ImageUtil;
  * ping's glyph when one is set; that type is then excluded from the rim), and
  * the rim divides evenly among the enabled options - down to none, where only
  * the center circle shows. Colors and transparency come from the appearance
- * config. Icons are the same glyph PNGs the scene overlay uses, tinted to my
- * party color when recoloring is on, so the wheel ships no extra art.
+ * config. Icons are the same glyph PNGs the scene overlay uses, tinted to the
+ * sender's party color (carried in the ping message) when this client has
+ * glyph recoloring enabled, so the wheel ships no extra art.
  */
 class PingWheelOverlay extends Overlay
 {
@@ -110,9 +111,9 @@ class PingWheelOverlay extends Overlay
 				return ENROUTE;
 		}
 
-		// the wheel shows my own pings: tint the glyph to my party color when
-		// glyph recoloring is on, exactly like the scene glyphs (attack and
-		// defend keep their baked-in colors there, so they do here too)
+		// tint the glyph to the sender's party color only when this client has
+		// recoloring enabled (per-client choice); attack, defend, mage, range
+		// and melee keep their baked-in colors everywhere, so they do here too
 		if (config.recolorGlyphs() && PingsOverlay.isRecolorable(type))
 		{
 			final Color c = plugin.myColor();
