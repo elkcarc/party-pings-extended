@@ -116,6 +116,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 	{
 		wsClient.registerMessage(TilePing.class);
 		wsClient.registerMessage(TilePingExtended.class);
+		keyManager.registerKeyListener(defaultHotkeyListener);
 		keyManager.registerKeyListener(enrouteHotkeyListener);
 		keyManager.registerKeyListener(avoidHotkeyListener);
 		keyManager.registerKeyListener(cautionHotkeyListener);
@@ -135,6 +136,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 	{
 		wsClient.unregisterMessage(TilePing.class);
 		wsClient.unregisterMessage(TilePingExtended.class);
+		keyManager.unregisterKeyListener(defaultHotkeyListener);
 		keyManager.unregisterKeyListener(enrouteHotkeyListener);
 		keyManager.unregisterKeyListener(avoidHotkeyListener);
 		keyManager.unregisterKeyListener(cautionHotkeyListener);
@@ -186,12 +188,49 @@ public class PartyPingsExtendedPlugin extends Plugin
 			mageHotkeyPressed = false;
 			rangeHotkeyPressed = false;
 			meleeHotkeyPressed = false;
+			defaultHotkeyPressed = false;
 			// close the wheel without pinging
 			wheelSession = null;
 		}
 	}
 
 	// ----- per-type hotkey mode (inactive while the wheel is enabled) -----
+
+	private final HotkeyListener defaultHotkeyListener = new HotkeyListener(() -> config.defaultPingHotkey())
+	{
+		@Override
+		public void keyPressed(java.awt.event.KeyEvent e)
+		{
+			if (config.pingWheelEnabled())
+		{
+				return; // wheel mode: stay passive so this bind never eats a key
+			}
+			super.keyPressed(e);
+		}
+
+		@Override
+		public void keyTyped(java.awt.event.KeyEvent e)
+		{
+			if (config.pingWheelEnabled())
+			{
+				return;
+			}
+			super.keyTyped(e);
+		}
+
+		@Override
+		public void hotkeyPressed()
+		{
+			defaultHotkeyPressed = true;
+		}
+
+		@Override
+		public void hotkeyReleased()
+		{
+			defaultHotkeyPressed = false;
+		}
+	};
+	private boolean defaultHotkeyPressed = false;
 
 	private final HotkeyListener enrouteHotkeyListener = new HotkeyListener(() -> config.enroutePingHotkey())
 	{
@@ -562,7 +601,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 			return;
 		}
 
-		boolean hotkeyPressed = enrouteHotkeyPressed || avoidHotkeyPressed || cautionHotkeyPressed || questionHotkeyPressed
+		boolean hotkeyPressed = defaultHotkeyPressed || enrouteHotkeyPressed || avoidHotkeyPressed || cautionHotkeyPressed || questionHotkeyPressed
 			|| attackHotkeyPressed || defendHotkeyPressed || mageHotkeyPressed || rangeHotkeyPressed || meleeHotkeyPressed;
 
 		if (!hotkeyPressed || client.isMenuOpen())
@@ -596,8 +635,11 @@ public class PartyPingsExtendedPlugin extends Plugin
 			return;
 		}
 
-		PingType pingType = PingType.ENROUTE;
-		if (enrouteHotkeyPressed) {
+		PingType pingType = PingType.DEFAULT;
+		if (defaultHotkeyPressed) {
+			pingType = PingType.DEFAULT;
+		}
+		else if (enrouteHotkeyPressed) {
 			pingType = PingType.ENROUTE;
 		}
 		else if (avoidHotkeyPressed) {
@@ -681,12 +723,10 @@ public class PartyPingsExtendedPlugin extends Plugin
 				wheelSession = null;
 
 				PingType selected = hoveredType(session);
-				if (selected == PingType.DEFAULT)
+				if (selected == null)
 				{
 					// aimed at the center: the configured quick ping
-					selected = config.quickPing().getPingType() == null
-						? PingType.DEFAULT
-						: config.quickPing().getPingType();
+					selected = config.quickPing();
 				}
 				if (selected != null)
 				{
@@ -710,41 +750,45 @@ public class PartyPingsExtendedPlugin extends Plugin
 	// never appears on the rim at all.
 	java.util.List<PingType> enabledTypes()
 	{
-		List<PingType> types = new ArrayList<>();
-		final PingType quick = config.quickPing().getPingType();
+		java.util.List<PingType> types = new ArrayList<>();
+		final PingType quick = config.quickPing();
+		if (config.wheelDefault() && quick != PingType.DEFAULT)
+		{
+			types.add(PingType.DEFAULT);
+		}
 		if (config.wheelEnroute() && quick != PingType.ENROUTE)
 		{
 			types.add(PingType.ENROUTE);
 		}
-		if (config.wheelAvoid() && quick != PingType.AVOID)
+		if (config.wheelAvoid())
 		{
 			types.add(PingType.AVOID);
 		}
-		if (config.wheelCaution() && quick != PingType.CAUTION)
+		if (config.wheelCaution())
 		{
 			types.add(PingType.CAUTION);
 		}
-		if (config.wheelQuestion() && quick != PingType.QUESTION)
+		if (config.wheelQuestion())
 		{
 			types.add(PingType.QUESTION);
 		}
-		if (config.wheelAttack() && quick != PingType.ATTACK)
+		if (config.wheelAttack())
 		{
 			types.add(PingType.ATTACK);
 		}
-		if (config.wheelDefend() && quick != PingType.DEFEND)
+		if (config.wheelDefend())
 		{
 			types.add(PingType.DEFEND);
 		}
-		if (config.wheelMage() && quick != PingType.MAGE)
+		if (config.wheelMage())
 		{
 			types.add(PingType.MAGE);
 		}
-		if (config.wheelRange() && quick != PingType.RANGE)
+		if (config.wheelRange())
 		{
 			types.add(PingType.RANGE);
 		}
-		if (config.wheelMelee() && quick != PingType.MELEE)
+		if (config.wheelMelee())
 		{
 			types.add(PingType.MELEE);
 		}
@@ -768,7 +812,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 		final int dy = drag.y - session.center.y;
 		if (dx * dx + dy * dy < WHEEL_DEAD_ZONE * WHEEL_DEAD_ZONE)
 		{
-			return PingType.DEFAULT; // aimed at the center: the quick ping
+			return null; // the center selects the quick ping (resolved by the caller)
 		}
 		if (session.types.isEmpty())
 		{

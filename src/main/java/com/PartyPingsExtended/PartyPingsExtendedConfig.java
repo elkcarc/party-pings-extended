@@ -40,11 +40,12 @@ public interface PartyPingsExtendedConfig extends Config
 	}
 
 	@ConfigSection(
- 			name = "Ping wheel",
+   			name = "Ping wheel",
 			description = "Single-key radial ping wheel. Hold the wheel hotkey and move the mouse to aim<br>"
 					+ "at an option, release the key to send it to the tile hovered when it opened.<br>"
 					+ "Mouse clicks pass straight through to the game. Only enabled options show<br>"
-					+ "on the rim; aiming at no option sends the quick ping (none if not set).",
+					+ "on the rim, including 'Default' (a plain tile ping with no glyph). The quick<br>"
+					+ "ping is carried by the center only - never shown on the rim.",
 			position = 3,
 			closedByDefault = true
 	)
@@ -67,23 +68,35 @@ public interface PartyPingsExtendedConfig extends Config
 	@ConfigItem(
 			keyName = "quickPing",
 			name = "Quick ping",
-			description = "Ping sent when the wheel key is released with the cursor in the center.<br>"
-					+ "'Default' sends a regular tile ping with no glyph (shown as no glyph in the<br>"
-					+ "center). A glyph type shows that glyph in the wheel's center and removes it<br>"
-					+ "from the rim.",
+			description = "Ping carried by the wheel's center: releasing the wheel key while the cursor<br>"
+					+ "is in the center sends it, and a glyph type shows its glyph in the center and is<br>"
+					+ "removed from the rim. 'DEFAULT' means the center carries the plain tile ping<br>"
+					+ "(no glyph); DEFAULT is then absent from the rim.",
 			position = 5,
 			section = "pingWheelSection"
 	)
-	default QuickPing quickPing()
+	default PingType quickPing()
 	{
-		return QuickPing.DEFAULT;
+		return PingType.DEFAULT;
+	}
+
+	@ConfigItem(
+			keyName = "wheelDefault",
+			name = "Default",
+			description = "Show the default option on the wheel: a plain tile ping with no glyph.",
+			position = 6,
+			section = "pingWheelSection"
+	)
+	default boolean wheelDefault()
+	{
+		return false;
 	}
 
 	@ConfigItem(
 			keyName = "wheelEnroute",
 			name = "En-route",
 			description = "Show the en-route option on the wheel.",
-			position = 6,
+			position = 7,
 			section = "pingWheelSection"
 	)
 	default boolean wheelEnroute()
@@ -95,7 +108,7 @@ public interface PartyPingsExtendedConfig extends Config
 			keyName = "wheelAvoid",
 			name = "Avoid",
 			description = "Show the avoid option on the wheel.",
-			position = 7,
+			position = 8,
 			section = "pingWheelSection"
 	)
 	default boolean wheelAvoid()
@@ -107,7 +120,7 @@ public interface PartyPingsExtendedConfig extends Config
 			keyName = "wheelCaution",
 			name = "Caution",
 			description = "Show the caution option on the wheel.",
-			position = 8,
+			position = 9,
 			section = "pingWheelSection"
 	)
 	default boolean wheelCaution()
@@ -119,7 +132,7 @@ public interface PartyPingsExtendedConfig extends Config
 			keyName = "wheelQuestion",
 			name = "Question",
 			description = "Show the question option on the wheel.",
-			position = 9,
+			position = 10,
 			section = "pingWheelSection"
 	)
 	default boolean wheelQuestion()
@@ -131,7 +144,7 @@ public interface PartyPingsExtendedConfig extends Config
 			keyName = "wheelAttack",
 			name = "Attack",
 			description = "Show the attack option on the wheel.",
-			position = 10,
+			position = 11,
 			section = "pingWheelSection"
 	)
 	default boolean wheelAttack()
@@ -143,7 +156,7 @@ public interface PartyPingsExtendedConfig extends Config
 			keyName = "wheelDefend",
 			name = "Defend",
 			description = "Show the defend option on the wheel.",
-			position = 11,
+			position = 12,
 			section = "pingWheelSection"
 	)
 	default boolean wheelDefend()
@@ -155,7 +168,7 @@ public interface PartyPingsExtendedConfig extends Config
 			keyName = "wheelMage",
 			name = "Mage",
 			description = "Show the mage option on the wheel.",
-			position = 12,
+			position = 13,
 			section = "pingWheelSection"
 	)
 	default boolean wheelMage()
@@ -167,7 +180,7 @@ public interface PartyPingsExtendedConfig extends Config
 			keyName = "wheelRange",
 			name = "Range",
 			description = "Show the range option on the wheel.",
-			position = 13,
+			position = 14,
 			section = "pingWheelSection"
 	)
 	default boolean wheelRange()
@@ -179,7 +192,7 @@ public interface PartyPingsExtendedConfig extends Config
 			keyName = "wheelMelee",
 			name = "Melee",
 			description = "Show the melee option on the wheel.",
-			position = 14,
+			position = 15,
 			section = "pingWheelSection"
 	)
 	default boolean wheelMelee()
@@ -251,18 +264,32 @@ public interface PartyPingsExtendedConfig extends Config
 	@ConfigSection(
 			name = "Hotkey pings",
 			description = "Per-type hold-and-click hotkeys. Only active while the ping wheel is disabled;<br>"
-					+ "a bind that is not active never captures its key.",
+					+ "a bind that is not active never captures its key. The 'Default' bind sends a<br>"
+					+ "plain tile ping with no glyph.",
 			position = 5,
 			closedByDefault = true
 	)
 	String hotkeySection = "hotkeySection";
 
 	@ConfigItem(
+			keyName = "defaultPingHotkey",
+			name = "Default ping hotkey",
+			description = "Key to hold to send a plain tile ping with no glyph.<br>"
+					+ "To ping, hold the ping hotkey down and click on the tile you want to ping.",
+			position = 13,
+			section = "hotkeySection"
+	)
+	default Keybind defaultPingHotkey()
+	{
+		return Keybind.NOT_SET;
+	}
+
+	@ConfigItem(
 			keyName = "enroutePingHotkey",
 			name = "En-route ping hotkey",
 			description = "Key to hold to send a tile ping with an en-route symbol.<br>"
 					+ "To ping, hold the ping hotkey down and click on the tile you want to ping.",
-			position = 13,
+			position = 14,
 			section = "hotkeySection"
 	)
 	default Keybind enroutePingHotkey()
@@ -275,7 +302,7 @@ public interface PartyPingsExtendedConfig extends Config
 			name = "Avoid ping hotkey",
 			description = "Key to hold to send a tile ping with an avoid symbol.<br>"
 					+ "To ping, hold the ping hotkey down and click on the tile you want to ping.",
-			position = 14,
+			position = 15,
 			section = "hotkeySection"
 	)
 	default Keybind avoidPingHotkey()
@@ -288,7 +315,7 @@ public interface PartyPingsExtendedConfig extends Config
 			name = "Caution ping hotkey",
 			description = "Key to hold to send a  tile ping with a caution symbol.<br>"
 					+ "To ping, hold the ping hotkey down and click on the tile you want to ping.",
-			position = 15,
+			position = 16,
 			section = "hotkeySection"
 	)
 	default Keybind cautionPingHotkey()
@@ -301,7 +328,7 @@ public interface PartyPingsExtendedConfig extends Config
 			name = "Question ping hotkey",
 			description = "Key to hold to send a tile ping with a question symbol.<br>"
 					+ "To ping, hold the ping hotkey down and click on the tile you want to ping.",
-			position = 16,
+			position = 17,
 			section = "hotkeySection"
 	)
 	default Keybind questionPingHotkey()
@@ -314,7 +341,7 @@ public interface PartyPingsExtendedConfig extends Config
 		name = "Attack ping hotkey",
 			description = "Key to hold to send a tile ping with an attack symbol.<br>"
 					+ "To ping, hold the ping hotkey down and click on the tile you want to ping.",
-			position = 17,
+			position = 18,
 			section = "hotkeySection"
 	)
 	default Keybind attackPingHotkey()
@@ -327,7 +354,7 @@ public interface PartyPingsExtendedConfig extends Config
 			name = "Defend ping hotkey",
 			description = "Key to hold to send a tile ping with a defend symbol.<br>"
 					+ "To ping, hold the ping hotkey down and click on the tile you want to ping.",
-			position = 18,
+			position = 19,
 			section = "hotkeySection"
 	)
 	default Keybind defendPingHotkey()
@@ -340,7 +367,7 @@ public interface PartyPingsExtendedConfig extends Config
 			name = "Mage ping hotkey",
 			description = "Key to hold to send a tile ping with a mage symbol.<br>"
 					+ "To ping, hold the ping hotkey down and click on the tile you want to ping.",
-			position = 19,
+			position = 20,
 			section = "hotkeySection"
 	)
 	default Keybind magePingHotkey()
@@ -353,7 +380,7 @@ public interface PartyPingsExtendedConfig extends Config
 			name = "Range ping hotkey",
 			description = "Key to hold to send a tile ping with a range symbol.<br>"
 					+ "To ping, hold the ping hotkey down and click on the tile you want to ping.",
-			position = 20,
+			position = 21,
 			section = "hotkeySection"
 	)
 	default Keybind rangePingHotkey()
@@ -366,7 +393,7 @@ public interface PartyPingsExtendedConfig extends Config
 			name = "Melee ping hotkey",
 			description = "Key to hold to send a tile ping with a melee symbol.<br>"
 					+ "To ping, hold the ping hotkey down and click on the tile you want to ping.",
-			position = 21,
+			position = 22,
 			section = "hotkeySection"
 	)
 	default Keybind meleePingHotkey()

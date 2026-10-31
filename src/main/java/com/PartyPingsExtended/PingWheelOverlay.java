@@ -85,6 +85,9 @@ class PingWheelOverlay extends Overlay
 		final BufferedImage base;
 		switch (type)
 		{
+			case DEFAULT:
+				// the default ping has no glyph
+				return null;
 			case ENROUTE:
 				base = ENROUTE;
 				break;
@@ -113,7 +116,7 @@ class PingWheelOverlay extends Overlay
 				base = MELEE;
 				break;
 			default:
-				return ENROUTE;
+				return null;
 		}
 
 		// tint the glyph to the sender's party color only when this client has
@@ -169,12 +172,14 @@ class PingWheelOverlay extends Overlay
 		final double outer = PartyPingsExtendedPlugin.WHEEL_RADIUS;
 		final double inner = PartyPingsExtendedPlugin.WHEEL_DEAD_ZONE + 4;
 
-		// the center circle always renders, carrying the quick ping's glyph when
-		// one is set (that type is excluded from the rim); aiming at it is aiming
-		// at the quick ping, so it highlights like a segment. Its edge sits
-		// GAP_WIDTH away from the rim's inner edge, like every other gap
-		final PingType quick = config.quickPing().getPingType();
-		final boolean centerHovered = hovered == PingType.DEFAULT;
+		// the center circle carries the quick ping's glyph when one is set (the
+		// quick type never shows on the rim); aiming at the center selects the
+		// quick ping, so it highlights like a segment. Its edge sits GAP_WIDTH
+		// away from the rim's inner edge, like every other gap
+		final PingType quick = config.quickPing();
+		final java.awt.Point aim = session.drag;
+		final boolean centerHovered = (aim.x - cx) * (aim.x - cx) + (aim.y - cy) * (aim.y - cy)
+			<= PartyPingsExtendedPlugin.WHEEL_DEAD_ZONE * PartyPingsExtendedPlugin.WHEEL_DEAD_ZONE;
 		final double hub = inner - GAP_WIDTH;
 		final double hubBw = centerHovered ? HOVER_STROKE : STROKE_WIDTH;
 		final Ellipse2D hubCircle = new Ellipse2D.Double(cx - hub, cy - hub, hub * 2, hub * 2);
@@ -187,10 +192,10 @@ class PingWheelOverlay extends Overlay
 		graphics.fill(hubCircle);
 		graphics.setColor(centerHovered ? config.wheelHoverBorder() : config.wheelBorderColor());
 		graphics.fill(hubBorder);
-		if (quick != null)
+		final BufferedImage quickGlyph = icon(quick);
+		if (quickGlyph != null)
 		{
 			// drawn at native pixel size, unscaled, exactly like a scene ping
-			final BufferedImage quickGlyph = icon(quick);
 			graphics.drawImage(quickGlyph, cx - quickGlyph.getWidth() / 2, cy - quickGlyph.getHeight() / 2, null);
 		}
 
@@ -256,9 +261,12 @@ class PingWheelOverlay extends Overlay
 			final double iconRadius = (inner + outer) / 2 + 2;
 			final int ix = (int) Math.round(cx + Math.cos(rad) * iconRadius);
 			final int iy = (int) Math.round(cy + Math.sin(rad) * iconRadius);
-			// drawn at native pixel size, unscaled, exactly like a scene ping
 			final BufferedImage glyph = icon(type);
-			graphics.drawImage(glyph, ix - glyph.getWidth() / 2, iy - glyph.getHeight() / 2, null);
+			if (glyph != null)
+			{
+				// drawn at native pixel size, unscaled, exactly like a scene ping
+				graphics.drawImage(glyph, ix - glyph.getWidth() / 2, iy - glyph.getHeight() / 2, null);
+			}
 		}
 	}
 
