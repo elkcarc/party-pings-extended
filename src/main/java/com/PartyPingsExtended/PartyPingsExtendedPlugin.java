@@ -23,9 +23,11 @@ import net.runelite.api.Client;
 import net.runelite.client.Notifier;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.callback.Hooks;
+import net.runelite.client.party.PartyMember;
 import net.runelite.client.party.PartyService;
 import net.runelite.client.party.WSClient;
 import net.runelite.client.party.events.UserJoin;
+import net.runelite.client.party.events.UserPart;
 import net.runelite.client.plugins.party.messages.MemberColorUpdate;
 import net.runelite.client.plugins.party.messages.TilePing;
 import net.runelite.client.ui.overlay.OverlayManager;
@@ -38,6 +40,13 @@ import net.runelite.client.input.KeyManager;
 )
 public class PartyPingsExtendedPlugin extends Plugin
 {
+
+	// wheel geometry: outer radius and the central dead zone where no type is hovered
+	static final int WHEEL_RADIUS = 88;
+	static final int WHEEL_DEAD_ZONE = 30;
+
+	// guards against a single gesture ever double-firing; not a spam limiter
+	private static final long SEND_COOLDOWN_MS = 150;
 
 	@Inject
 	private Client client;
@@ -61,6 +70,9 @@ public class PartyPingsExtendedPlugin extends Plugin
 	private PingsOverlay pingsOverlay;
 
 	@Inject
+	private PingWheelOverlay pingWheelOverlay;
+
+	@Inject
 	private PartyPingsExtendedConfig config;
 
 	@Inject
@@ -75,6 +87,13 @@ public class PartyPingsExtendedPlugin extends Plugin
 	// Sender color per party member id, mirroring the built-in Party plugin:
 	// seeded WHITE on join, updated as members pick a custom color.
 	private final Map<Long, Color> memberColors = new ConcurrentHashMap<>();
+
+	// The open ping wheel, or null when closed. Written on the AWT thread,
+	// read on the client thread by the overlay.
+	@Getter
+	private volatile WheelSession wheelSession;
+
+	private long lastSendAt;
 
 	@Provides
 	PartyPingsExtendedConfig provideConfig(ConfigManager configManager)
@@ -94,7 +113,12 @@ public class PartyPingsExtendedPlugin extends Plugin
 		keyManager.registerKeyListener(questionHotkeyListener);
 		keyManager.registerKeyListener(attackHotkeyListener);
 		keyManager.registerKeyListener(defendHotkeyListener);
+		keyManager.registerKeyListener(mageHotkeyListener);
+		keyManager.registerKeyListener(rangeHotkeyListener);
+		keyManager.registerKeyListener(meleeHotkeyListener);
+		keyManager.registerKeyListener(wheelHotkeyListener);
 		overlayManager.add(pingsOverlay);
+		overlayManager.add(pingWheelOverlay);
 	}
 
 	@Override
@@ -109,7 +133,15 @@ public class PartyPingsExtendedPlugin extends Plugin
 		keyManager.unregisterKeyListener(questionHotkeyListener);
 		keyManager.unregisterKeyListener(attackHotkeyListener);
 		keyManager.unregisterKeyListener(defendHotkeyListener);
+		keyManager.unregisterKeyListener(mageHotkeyListener);
+		keyManager.unregisterKeyListener(rangeHotkeyListener);
+		keyManager.unregisterKeyListener(meleeHotkeyListener);
+		keyManager.unregisterKeyListener(wheelHotkeyListener);
 		overlayManager.remove(pingsOverlay);
+		overlayManager.remove(pingWheelOverlay);
+		wheelSession = null;
+		pendingTilePingsExtended.clear();
+		memberColors.clear();
 	}
 
 	@Subscribe
@@ -123,11 +155,38 @@ public class PartyPingsExtendedPlugin extends Plugin
 			questionHotkeyPressed = false;
 			attackHotkeyPressed = false;
 			defendHotkeyPressed = false;
+			mageHotkeyPressed = false;
+			rangeHotkeyPressed = false;
+			meleeHotkeyPressed = false;
+			// close the wheel without pinging
+			wheelSession = null;
 		}
 	}
 
+	// ----- per-type hotkey mode (inactive while the wheel is enabled) -----
+
 	private final HotkeyListener enrouteHotkeyListener = new HotkeyListener(() -> config.enroutePingHotkey())
 	{
+		@Override
+		public void keyPressed(java.awt.event.KeyEvent e)
+		{
+			if (config.pingWheelEnabled())
+			{
+				return; // wheel mode: stay passive so this bind never eats a key
+			}
+			super.keyPressed(e);
+		}
+
+		@Override
+		public void keyTyped(java.awt.event.KeyEvent e)
+		{
+			if (config.pingWheelEnabled())
+			{
+				return;
+			}
+			super.keyTyped(e);
+		}
+
 		@Override
 		public void hotkeyPressed()
 		{
@@ -145,6 +204,26 @@ public class PartyPingsExtendedPlugin extends Plugin
 	private final HotkeyListener avoidHotkeyListener = new HotkeyListener(() -> config.avoidPingHotkey())
 	{
 		@Override
+		public void keyPressed(java.awt.event.KeyEvent e)
+		{
+			if (config.pingWheelEnabled())
+			{
+				return; // wheel mode: stay passive so this bind never eats a key
+			}
+			super.keyPressed(e);
+		}
+
+		@Override
+		public void keyTyped(java.awt.event.KeyEvent e)
+		{
+			if (config.pingWheelEnabled())
+			{
+				return;
+			}
+			super.keyTyped(e);
+		}
+
+		@Override
 		public void hotkeyPressed()
 		{
 			avoidHotkeyPressed = true;
@@ -160,6 +239,26 @@ public class PartyPingsExtendedPlugin extends Plugin
 
 	private final HotkeyListener cautionHotkeyListener = new HotkeyListener(() -> config.cautionPingHotkey())
 	{
+		@Override
+		public void keyPressed(java.awt.event.KeyEvent e)
+		{
+			if (config.pingWheelEnabled())
+			{
+				return; // wheel mode: stay passive so this bind never eats a key
+			}
+			super.keyPressed(e);
+		}
+
+		@Override
+		public void keyTyped(java.awt.event.KeyEvent e)
+		{
+			if (config.pingWheelEnabled())
+			{
+				return;
+			}
+			super.keyTyped(e);
+		}
+
 		@Override
 		public void hotkeyPressed()
 		{
@@ -177,6 +276,26 @@ public class PartyPingsExtendedPlugin extends Plugin
 	private final HotkeyListener questionHotkeyListener = new HotkeyListener(() -> config.questionPingHotkey())
 	{
 		@Override
+		public void keyPressed(java.awt.event.KeyEvent e)
+		{
+			if (config.pingWheelEnabled())
+			{
+				return; // wheel mode: stay passive so this bind never eats a key
+			}
+			super.keyPressed(e);
+		}
+
+		@Override
+		public void keyTyped(java.awt.event.KeyEvent e)
+		{
+			if (config.pingWheelEnabled())
+			{
+				return;
+			}
+			super.keyTyped(e);
+		}
+
+		@Override
 		public void hotkeyPressed()
 		{
 			questionHotkeyPressed = true;
@@ -192,6 +311,26 @@ public class PartyPingsExtendedPlugin extends Plugin
 
 	private final HotkeyListener attackHotkeyListener = new HotkeyListener(() -> config.attackPingHotkey())
 	{
+		@Override
+		public void keyPressed(java.awt.event.KeyEvent e)
+		{
+			if (config.pingWheelEnabled())
+			{
+				return; // wheel mode: stay passive so this bind never eats a key
+			}
+			super.keyPressed(e);
+		}
+
+		@Override
+		public void keyTyped(java.awt.event.KeyEvent e)
+		{
+			if (config.pingWheelEnabled())
+			{
+				return;
+			}
+			super.keyTyped(e);
+		}
+
 		@Override
 		public void hotkeyPressed()
 		{
@@ -209,6 +348,26 @@ public class PartyPingsExtendedPlugin extends Plugin
 	private final HotkeyListener defendHotkeyListener = new HotkeyListener(() -> config.defendPingHotkey())
 	{
 		@Override
+		public void keyPressed(java.awt.event.KeyEvent e)
+		{
+			if (config.pingWheelEnabled())
+			{
+				return; // wheel mode: stay passive so this bind never eats a key
+			}
+			super.keyPressed(e);
+		}
+
+		@Override
+		public void keyTyped(java.awt.event.KeyEvent e)
+		{
+			if (config.pingWheelEnabled())
+			{
+				return;
+			}
+			super.keyTyped(e);
+		}
+
+		@Override
 		public void hotkeyPressed()
 		{
 			defendHotkeyPressed = true;
@@ -222,12 +381,148 @@ public class PartyPingsExtendedPlugin extends Plugin
 	};
 	private boolean defendHotkeyPressed = false;
 
+	private final HotkeyListener mageHotkeyListener = new HotkeyListener(() -> config.magePingHotkey())
+	{
+		@Override
+		public void keyPressed(java.awt.event.KeyEvent e)
+		{
+			if (config.pingWheelEnabled())
+			{
+				return; // wheel mode: stay passive so this bind never eats a key
+			}
+			super.keyPressed(e);
+		}
+
+		@Override
+		public void keyTyped(java.awt.event.KeyEvent e)
+		{
+			if (config.pingWheelEnabled())
+			{
+				return;
+			}
+			super.keyTyped(e);
+		}
+
+		@Override
+		public void hotkeyPressed()
+		{
+			mageHotkeyPressed = true;
+		}
+
+		@Override
+		public void hotkeyReleased()
+		{
+			mageHotkeyPressed = false;
+		}
+	};
+	private boolean mageHotkeyPressed = false;
+
+	private final HotkeyListener rangeHotkeyListener = new HotkeyListener(() -> config.rangePingHotkey())
+	{
+		@Override
+		public void keyPressed(java.awt.event.KeyEvent e)
+		{
+			if (config.pingWheelEnabled())
+			{
+				return; // wheel mode: stay passive so this bind never eats a key
+			}
+			super.keyPressed(e);
+		}
+
+		@Override
+		public void keyTyped(java.awt.event.KeyEvent e)
+		{
+			if (config.pingWheelEnabled())
+			{
+				return;
+			}
+			super.keyTyped(e);
+		}
+
+		@Override
+		public void hotkeyPressed()
+		{
+			rangeHotkeyPressed = true;
+		}
+
+		@Override
+		public void hotkeyReleased()
+		{
+			rangeHotkeyPressed = false;
+		}
+	};
+	private boolean rangeHotkeyPressed = false;
+
+	private final HotkeyListener meleeHotkeyListener = new HotkeyListener(() -> config.meleePingHotkey())
+	{
+		@Override
+		public void keyPressed(java.awt.event.KeyEvent e)
+		{
+			if (config.pingWheelEnabled())
+			{
+				return; // wheel mode: stay passive so this bind never eats a key
+			}
+			super.keyPressed(e);
+		}
+
+		@Override
+		public void keyTyped(java.awt.event.KeyEvent e)
+		{
+			if (config.pingWheelEnabled())
+			{
+				return;
+			}
+			super.keyTyped(e);
+		}
+
+		@Override
+		public void hotkeyPressed()
+		{
+			meleeHotkeyPressed = true;
+		}
+
+		@Override
+		public void hotkeyReleased()
+		{
+			meleeHotkeyPressed = false;
+		}
+	};
+	private boolean meleeHotkeyPressed = false;
+
+	// Whether the wheel currently owns input. The wheel hotkey and the per-type
+	// binds consult this so a bind that is not in use never captures its key.
+	boolean wheelActive()
+	{
+		return config.pingWheelEnabled();
+	}
+
+	// Pings only work in a party: no wheel, no glyph, no send outside one.
+	boolean inParty()
+	{
+		return party.isInParty();
+	}
+
+	// My current party member color (WHITE until known), for tinting the wheel's
+	// glyphs the same way the scene overlay tints scene glyphs.
+	Color myColor()
+	{
+		final PartyMember local = party.getLocalMember();
+		return memberColors.getOrDefault(local != null ? local.getMemberId() : -1L, Color.WHITE);
+	}
+
 	@Subscribe
 	public void onMenuOptionClicked(MenuOptionClicked event)
 	{
-		boolean hotkeyPressed = enrouteHotkeyPressed || avoidHotkeyPressed || cautionHotkeyPressed || questionHotkeyPressed || attackHotkeyPressed || defendHotkeyPressed;
+		// wheel mode owns input: no per-type bind is active then
+		if (wheelActive())
+		{
+			return;
+		}
 
-		if (!hotkeyPressed || client.isMenuOpen() || !party.isInParty() )
+		boolean hotkeyPressed = enrouteHotkeyPressed || avoidHotkeyPressed || cautionHotkeyPressed || questionHotkeyPressed
+			|| attackHotkeyPressed || defendHotkeyPressed || mageHotkeyPressed || rangeHotkeyPressed || meleeHotkeyPressed;
+
+		if (!hotkeyPressed || client.isMenuOpen())
 		{
 			return;
 		}
@@ -258,7 +553,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 			return;
 		}
 
-		PingType pingType = PingType.ENROUTE;;
+		PingType pingType = PingType.ENROUTE;
 		if (enrouteHotkeyPressed) {
 			pingType = PingType.ENROUTE;
 		}
@@ -277,15 +572,223 @@ public class PartyPingsExtendedPlugin extends Plugin
 		else if (defendHotkeyPressed) {
 			pingType = PingType.DEFEND;
 		}
-
+		else if (mageHotkeyPressed) {
+			pingType = PingType.MAGE;
+		}
+		else if (rangeHotkeyPressed) {
+			pingType = PingType.RANGE;
+		}
+		else if (meleeHotkeyPressed) {
+			pingType = PingType.MELEE;
+		}
 
 		event.consume();
 		final WorldPoint point = selectedSceneTile.getWorldLocation();
 		final PingType finalPingType = pingType;
-		clientThread.invokeLater(() -> {
+		clientThread.invokeLater(() -> sendPing(finalPingType, point));
+	}
+
+	// ----- ping wheel mode: hold the key, aim with the mouse, release to send -----
+
+	private final HotkeyListener wheelHotkeyListener = new HotkeyListener(() -> config.pingWheelHotkey())
+	{
+		@Override
+		public void keyPressed(java.awt.event.KeyEvent e)
+		{
+			if (!config.pingWheelEnabled())
+			{
+				return; // per-type mode: the wheel bind must never eat a key
+			}
+			super.keyPressed(e);
+		}
+
+		@Override
+		public void keyTyped(java.awt.event.KeyEvent e)
+		{
+			if (!config.pingWheelEnabled())
+			{
+				return;
+			}
+			super.keyTyped(e);
+		}
+
+		@Override
+		public void hotkeyPressed()
+		{
+			if (wheelSession == null && client.getGameState() == GameState.LOGGED_IN)
+			{
+				// the wheel always opens when enabled, whatever the quick ping
+				// selection is
+				Tile tile = client.getSelectedSceneTile();
+				net.runelite.api.Point mouse = client.getMouseCanvasPosition();
+				if (tile != null && mouse != null && mouse.getX() != -1)
+				{
+					java.awt.Point aim = new java.awt.Point(mouse.getX(), mouse.getY());
+					wheelSession = new WheelSession(aim, tile.getWorldLocation(), enabledTypes());
+				}
+			}
+		}
+
+		@Override
+		public void hotkeyReleased()
+		{
+			WheelSession session = wheelSession;
+			if (session != null)
+			{
+				wheelSession = null;
+
+				PingType selected = hoveredType(session);
+				if (selected == PingType.DEFAULT)
+				{
+					// aimed at the center: the configured quick ping
+					selected = config.quickPing().getPingType() == null
+						? PingType.DEFAULT
+						: config.quickPing().getPingType();
+				}
+				if (selected != null)
+				{
+					sendPing(selected, session.target);
+				}
+			}
+		}
+
+		@Override
+		public void focusLost()
+		{
+			// alt-tab and the like: close the wheel without pinging
+			wheelSession = null;
+			super.focusLost();
+		}
+	};
+
+	// The rim options currently enabled in config, in enum order. The wheel
+	// divides itself evenly among exactly these. The quick ping, when it is a
+	// glyph type, is excluded (it shows in the center instead) and DEFAULT
+	// never appears on the rim at all.
+	java.util.List<PingType> enabledTypes()
+	{
+		List<PingType> types = new ArrayList<>();
+		final PingType quick = config.quickPing().getPingType();
+		if (config.wheelEnroute() && quick != PingType.ENROUTE)
+		{
+			types.add(PingType.ENROUTE);
+		}
+		if (config.wheelAvoid() && quick != PingType.AVOID)
+		{
+			types.add(PingType.AVOID);
+		}
+		if (config.wheelCaution() && quick != PingType.CAUTION)
+		{
+			types.add(PingType.CAUTION);
+		}
+		if (config.wheelQuestion() && quick != PingType.QUESTION)
+		{
+			types.add(PingType.QUESTION);
+		}
+		if (config.wheelAttack() && quick != PingType.ATTACK)
+		{
+			types.add(PingType.ATTACK);
+		}
+		if (config.wheelDefend() && quick != PingType.DEFEND)
+		{
+			types.add(PingType.DEFEND);
+		}
+		if (config.wheelMage() && quick != PingType.MAGE)
+		{
+			types.add(PingType.MAGE);
+		}
+		if (config.wheelRange() && quick != PingType.RANGE)
+		{
+			types.add(PingType.RANGE);
+		}
+		if (config.wheelMelee() && quick != PingType.MELEE)
+		{
+			types.add(PingType.MELEE);
+		}
+		return types;
+	}
+
+	/**
+	 * Maps the session's current aim to one of its enabled segments; null inside
+	 * the dead zone. Segments are centered top-first, continuing clockwise,
+	 * divided evenly among the enabled types in enum order.
+	 */
+	/**
+	 * Maps the session's current aim to one of its segments. Aiming at the
+	 * center returns DEFAULT (the quick ping), so the center highlights and
+	 * behaves like a segment of its own; null only when the rim is empty.
+	 */
+	static PingType hoveredType(WheelSession session)
+	{
+		final java.awt.Point drag = session.drag;
+		final int dx = drag.x - session.center.x;
+		final int dy = drag.y - session.center.y;
+		if (dx * dx + dy * dy < WHEEL_DEAD_ZONE * WHEEL_DEAD_ZONE)
+		{
+			return PingType.DEFAULT; // aimed at the center: the quick ping
+		}
+		if (session.types.isEmpty())
+		{
+			return null;
+		}
+
+		final List<PingType> types = session.types;
+		final double segment = 360.0 / types.size();
+		final double angle = Math.toDegrees(Math.atan2(dy, dx)); // 0 = east, clockwise positive
+		final int index = (int) Math.floor((((angle + 90 + segment / 2) % 360) + 360) % 360 / segment);
+		return types.get(index);
+	}
+
+	static class WheelSession
+	{
+		final java.awt.Point center;
+		final WorldPoint target;
+		final List<PingType> types; // enabled rim options, enum order
+		volatile java.awt.Point drag;
+
+		WheelSession(java.awt.Point center, WorldPoint target, List<PingType> types)
+		{
+			this.center = center;
+			this.target = target;
+			this.types = types;
+			this.drag = center;
+		}
+	}
+
+	// ----- shared send path -----
+
+	private void sendPing(PingType type, WorldPoint point)
+	{
+		// outside a party, pings do nothing at all
+		if (!party.isInParty())
+		{
+			return;
+		}
+
+		final long now = System.currentTimeMillis();
+		if (now - lastSendAt < SEND_COOLDOWN_MS)
+		{
+			return;
+		}
+		lastSendAt = now;
+
+		// DEFAULT is a plain built-in ping: tile and sound only, no glyph
+		if (type == PingType.DEFAULT)
+		{
 			party.send(new TilePing(point));
-			party.send(new TilePingExtended(point, finalPingType));
-		});
+			return;
+		}
+
+		// render it locally right away; the party echo is skipped by id in
+		// onTilePingExtended, so this stays the single source for local display
+		final PartyMember local = party.getLocalMember();
+		final Color color = memberColors.getOrDefault(local != null ? local.getMemberId() : -1L, Color.WHITE);
+		final PartyTilePingDataExtended data = new PartyTilePingDataExtended(point, type);
+		data.setColor(color);
+		pendingTilePingsExtended.add(data);
+
+		party.send(new TilePing(point));
+		party.send(new TilePingExtended(point, type));
 	}
 
 	@Subscribe
@@ -301,8 +804,24 @@ public class PartyPingsExtendedPlugin extends Plugin
 	}
 
 	@Subscribe
+	public void onUserPart(UserPart event)
+	{
+		memberColors.remove(event.getMemberId());
+		wheelSession = null;
+		// drop in-flight pings: outside a party, nothing renders
+		pendingTilePingsExtended.clear();
+	}
+
+	@Subscribe
 	public void onTilePingExtended(TilePingExtended event)
 	{
+		final PartyMember local = party.getLocalMember();
+		if (local != null && event.getMemberId() == local.getMemberId())
+		{
+			// our own ping echoed back; it was already shown on send
+			return;
+		}
+
 		PartyTilePingDataExtended data = new PartyTilePingDataExtended(event.getPoint(), event.getPingType());
 		data.setColor(memberColors.getOrDefault(event.getMemberId(), Color.WHITE));
 		pendingTilePingsExtended.add(data);

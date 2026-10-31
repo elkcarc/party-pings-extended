@@ -26,13 +26,16 @@ class PingsOverlay extends Overlay
     private final BufferedImage QUESTION;
     private final BufferedImage ATTACK;
     private final BufferedImage DEFEND;
+    private final BufferedImage MAGE;
+    private final BufferedImage RANGE;
+    private final BufferedImage MELEE;
 
     // Cached tinted glyphs, keyed by "pingType:colorRGB", so a given sender
     // color is tinted once per glyph instead of on every render frame.
     private final Map<String, BufferedImage> tintedGlyphs = new HashMap<>();
 
-    // The four semantic glyphs that follow the sender's party color; attack and
-    // defend keep their baked-in image colors.
+    // The four semantic glyphs that follow the sender's party color; attack,
+    // defend, mage, range and melee keep their baked-in image colors.
     static boolean isRecolorable(PingType type)
     {
         switch (type)
@@ -85,6 +88,9 @@ class PingsOverlay extends Overlay
         QUESTION = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/questionmark.png");
         ATTACK = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/attackmark.png");
         DEFEND = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/defendmark.png");
+        MAGE = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/Mage.png");
+        RANGE = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/Range.png");
+        MELEE = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/Melee.png");
     }
 
     @Override
@@ -122,42 +128,49 @@ class PingsOverlay extends Overlay
         }
 
         BufferedImage Glyph;
-        switch(ping.getPingType().getPingType())
+        switch (ping.getPingType())
         {
-            case 1:
+            case ENROUTE:
                 Glyph = ENROUTE;
                 break;
-            case 2:
+            case AVOID:
                 Glyph = AVOID;
                 break;
-            case 3:
+            case CAUTION:
                 Glyph = CAUTION;
                 break;
-            case 4:
+            case QUESTION:
                 Glyph = QUESTION;
                 break;
-            case 5:
+            case ATTACK:
                 Glyph = ATTACK;
                 break;
-            case 6:
+            case DEFEND:
                 Glyph = DEFEND;
+                break;
+            case MAGE:
+                Glyph = MAGE;
+                break;
+            case RANGE:
+                Glyph = RANGE;
+                break;
+            case MELEE:
+                Glyph = MELEE;
                 break;
             default:
                 return;
         }
 
-        // Tint the four semantic glyphs to the sender's party color so they
-        // match the built-in tile highlight; attack and defend keep their own.
+        // Recolor glyphs to match the built-in tile highlight
         if (config.recolorGlyphs() && isRecolorable(ping.getPingType()))
         {
             final BufferedImage base = Glyph;
             final Color c = ping.getColor();
-            final String key = ping.getPingType().getPingType() + ":" + (c.getRGB() & 0xFFFFFF);
+            final String key = ping.getPingType().name() + ":" + (c.getRGB() & 0xFFFFFF);
             Glyph = tintedGlyphs.computeIfAbsent(key, k -> tint(base, c));
         }
 
-        // Fade in lock-step with the built-in tile: bake the ping's alpha into
-        // each pixel so the glyph dims over its ~1 s life instead of popping out.
+        //Apply fade out
         int a = ping.getAlpha();
         if (a < 255)
         {
@@ -171,8 +184,6 @@ class PingsOverlay extends Overlay
         }
       }
 
-    // Return a copy of `src` with every pixel's alpha scaled by the global fade
-    // factor, preserving each pixel's own RGB. Fades the glyph without shifting hue.
     static BufferedImage applyAlpha(BufferedImage src, int alpha)
     {
         if (alpha >= 255)
