@@ -15,17 +15,6 @@ public interface PartyPingsExtendedConfig extends Config
 	String GROUP = "Party Pings Extended";
 
 	@ConfigItem(
-			keyName = "pingInputMode",
-			name = "Ping input",
-			description = "Choose between individual hotkeys and a ping wheel",
-			position = 1
-	)
-	default PingInputMode pingInputMode()
-	{
-		return PingInputMode.HOTKEYS;
-	}
-
-	@ConfigItem(
 			keyName = "recolorGlyphs",
 			name = "Recolor Glyphs",
 			description = "Recolor the three text Glyphs to match the ping color selected in the party plugin",

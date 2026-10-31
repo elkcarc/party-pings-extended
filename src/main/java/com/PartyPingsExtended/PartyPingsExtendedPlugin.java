@@ -49,9 +49,6 @@ public class PartyPingsExtendedPlugin extends Plugin
 	static final int WHEEL_RADIUS = 88;
 	static final int WHEEL_DEAD_ZONE = 30;
 
-	// guards against a single gesture ever double-firing; not a spam limiter
-	private static final long SEND_COOLDOWN_MS = 10;
-
 	@Inject
 	private Client client;
 
@@ -94,7 +91,8 @@ public class PartyPingsExtendedPlugin extends Plugin
 	@Getter
 	private volatile WheelSession wheelSession;
 
-	private long lastSendAt;
+	//which bind is currently held
+	private PingType latchedPing = null;
 
 	@Provides
 	PartyPingsExtendedConfig provideConfig(ConfigManager configManager)
@@ -138,15 +136,9 @@ public class PartyPingsExtendedPlugin extends Plugin
 		keyManager.unregisterKeyListener(wheelHotkeyListener);
 		overlayManager.remove(pingsOverlay);
 		overlayManager.remove(pingWheelOverlay);
-		clearGlyphCache();
+		pingWheelOverlay.clearGlyphCache();
 		wheelSession = null;
 		pendingTilePingsExtended.clear();
-	}
-
-	void clearGlyphCache()
-	{
-		pingsOverlay.clearGlyphCache();
-		pingWheelOverlay.clearGlyphCache();
 	}
 
 
@@ -156,7 +148,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 		if (PartyPingsExtendedConfig.GROUP.equals(event.getGroup())
 			&& ("recolorGlyphs".equals(event.getKey()) || "wheelDiameter".equals(event.getKey())))
 		{
-			clearGlyphCache();
+			pingWheelOverlay.clearGlyphCache();
 		}
 	}
 
@@ -165,16 +157,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 	{
 		if (!focusChanged.isFocused())
 		{
-			defaultHotkeyPressed = false;
-			avoidHotkeyPressed = false;
-			cautionHotkeyPressed = false;
-			questionHotkeyPressed = false;
-			attackHotkeyPressed = false;
-			defendHotkeyPressed = false;
-			mageHotkeyPressed = false;
-			rangeHotkeyPressed = false;
-			meleeHotkeyPressed = false;
-			defaultHotkeyPressed = false;
+			latchedPing = null;
 			wheelSession = null;
 		}
 	}
@@ -182,332 +165,139 @@ public class PartyPingsExtendedPlugin extends Plugin
 	private final HotkeyListener defaultHotkeyListener = new HotkeyListener(() -> config.defaultPingHotkey())
 	{
 		@Override
-		public void keyPressed(java.awt.event.KeyEvent e)
-		{
-			if (wheelActive())
-		{
-				return;
-			}
-			super.keyPressed(e);
-		}
-
-		@Override
-		public void keyTyped(java.awt.event.KeyEvent e)
-		{
-			if (wheelActive())
-			{
-				return;
-			}
-			super.keyTyped(e);
-		}
-
-		@Override
 		public void hotkeyPressed()
 		{
-			defaultHotkeyPressed = true;
+			latchedPing = PingType.DEFAULT;
 		}
 
 		@Override
 		public void hotkeyReleased()
 		{
-			defaultHotkeyPressed = false;
+			latchedPing = null;
 		}
 	};
-	private boolean defaultHotkeyPressed = false;
 
 	private final HotkeyListener avoidHotkeyListener = new HotkeyListener(() -> config.avoidPingHotkey())
 	{
 		@Override
-		public void keyPressed(java.awt.event.KeyEvent e)
-		{
-			if (wheelActive())
-			{
-				return;
-			}
-			super.keyPressed(e);
-		}
-
-		@Override
-		public void keyTyped(java.awt.event.KeyEvent e)
-		{
-			if (wheelActive())
-			{
-				return;
-			}
-			super.keyTyped(e);
-		}
-
-		@Override
 		public void hotkeyPressed()
 		{
-			avoidHotkeyPressed = true;
+			latchedPing = PingType.AVOID;
 		}
 
 		@Override
 		public void hotkeyReleased()
 		{
-			avoidHotkeyPressed = false;
+			latchedPing = null;
 		}
 	};
-	private boolean avoidHotkeyPressed = false;
 
 	private final HotkeyListener cautionHotkeyListener = new HotkeyListener(() -> config.cautionPingHotkey())
 	{
 		@Override
-		public void keyPressed(java.awt.event.KeyEvent e)
-		{
-			if (wheelActive())
-			{
-				return;
-			}
-			super.keyPressed(e);
-		}
-
-		@Override
-		public void keyTyped(java.awt.event.KeyEvent e)
-		{
-			if (wheelActive())
-			{
-				return;
-			}
-			super.keyTyped(e);
-		}
-
-		@Override
 		public void hotkeyPressed()
 		{
-			cautionHotkeyPressed = true;
+			latchedPing = PingType.CAUTION;
 		}
 
 		@Override
 		public void hotkeyReleased()
 		{
-			cautionHotkeyPressed = false;
+			latchedPing = null;
 		}
 	};
-	private boolean cautionHotkeyPressed = false;
 
 	private final HotkeyListener questionHotkeyListener = new HotkeyListener(() -> config.questionPingHotkey())
 	{
 		@Override
-		public void keyPressed(java.awt.event.KeyEvent e)
-		{
-			if (wheelActive())
-			{
-				return;
-			}
-			super.keyPressed(e);
-		}
-
-		@Override
-		public void keyTyped(java.awt.event.KeyEvent e)
-		{
-			if (wheelActive())
-			{
-				return;
-			}
-			super.keyTyped(e);
-		}
-
-		@Override
 		public void hotkeyPressed()
 		{
-			questionHotkeyPressed = true;
+			latchedPing = PingType.QUESTION;
 		}
 
 		@Override
 		public void hotkeyReleased()
 		{
-			questionHotkeyPressed = false;
+			latchedPing = null;
 		}
 	};
-	private boolean questionHotkeyPressed = false;
 
 	private final HotkeyListener attackHotkeyListener = new HotkeyListener(() -> config.attackPingHotkey())
 	{
 		@Override
-		public void keyPressed(java.awt.event.KeyEvent e)
-		{
-			if (wheelActive())
-			{
-				return;
-			}
-			super.keyPressed(e);
-		}
-
-		@Override
-		public void keyTyped(java.awt.event.KeyEvent e)
-		{
-			if (wheelActive())
-			{
-				return;
-			}
-			super.keyTyped(e);
-		}
-
-		@Override
 		public void hotkeyPressed()
 		{
-			attackHotkeyPressed = true;
+			latchedPing = PingType.ATTACK;
 		}
 
 		@Override
 		public void hotkeyReleased()
 		{
-			attackHotkeyPressed = false;
+			latchedPing = null;
 		}
 	};
-	private boolean attackHotkeyPressed = false;
 
 	private final HotkeyListener defendHotkeyListener = new HotkeyListener(() -> config.defendPingHotkey())
 	{
 		@Override
-		public void keyPressed(java.awt.event.KeyEvent e)
-		{
-			if (wheelActive())
-			{
-				return;
-			}
-			super.keyPressed(e);
-		}
-
-		@Override
-		public void keyTyped(java.awt.event.KeyEvent e)
-		{
-			if (wheelActive())
-			{
-				return;
-			}
-			super.keyTyped(e);
-		}
-
-		@Override
 		public void hotkeyPressed()
 		{
-			defendHotkeyPressed = true;
+			latchedPing = PingType.DEFEND;
 		}
 
 		@Override
 		public void hotkeyReleased()
 		{
-			defendHotkeyPressed = false;
+			latchedPing = null;
 		}
 	};
-	private boolean defendHotkeyPressed = false;
 
 	private final HotkeyListener mageHotkeyListener = new HotkeyListener(() -> config.magePingHotkey())
 	{
 		@Override
-		public void keyPressed(java.awt.event.KeyEvent e)
-		{
-			if (wheelActive())
-			{
-				return;
-			}
-			super.keyPressed(e);
-		}
-
-		@Override
-		public void keyTyped(java.awt.event.KeyEvent e)
-		{
-			if (wheelActive())
-			{
-				return;
-			}
-			super.keyTyped(e);
-		}
-
-		@Override
 		public void hotkeyPressed()
 		{
-			mageHotkeyPressed = true;
+			latchedPing = PingType.MAGE;
 		}
 
 		@Override
 		public void hotkeyReleased()
 		{
-			mageHotkeyPressed = false;
+			latchedPing = null;
 		}
 	};
-	private boolean mageHotkeyPressed = false;
 
 	private final HotkeyListener rangeHotkeyListener = new HotkeyListener(() -> config.rangePingHotkey())
 	{
 		@Override
-		public void keyPressed(java.awt.event.KeyEvent e)
-		{
-			if (wheelActive())
-			{
-				return;
-			}
-			super.keyPressed(e);
-		}
-
-		@Override
-		public void keyTyped(java.awt.event.KeyEvent e)
-		{
-			if (wheelActive())
-			{
-				return;
-			}
-			super.keyTyped(e);
-		}
-
-		@Override
 		public void hotkeyPressed()
 		{
-			rangeHotkeyPressed = true;
+			latchedPing = PingType.RANGE;
 		}
 
 		@Override
 		public void hotkeyReleased()
 		{
-			rangeHotkeyPressed = false;
+			latchedPing = null;
 		}
 	};
-	private boolean rangeHotkeyPressed = false;
 
 	private final HotkeyListener meleeHotkeyListener = new HotkeyListener(() -> config.meleePingHotkey())
 	{
 		@Override
-		public void keyPressed(java.awt.event.KeyEvent e)
-		{
-			if (wheelActive())
-			{
-				return;
-			}
-			super.keyPressed(e);
-		}
-
-		@Override
-		public void keyTyped(java.awt.event.KeyEvent e)
-		{
-			if (wheelActive())
-			{
-				return;
-			}
-			super.keyTyped(e);
-		}
-
-		@Override
 		public void hotkeyPressed()
 		{
-			meleeHotkeyPressed = true;
+			latchedPing = PingType.MELEE;
 		}
 
 		@Override
 		public void hotkeyReleased()
 		{
-			meleeHotkeyPressed = false;
+			latchedPing = null;
 		}
 	};
-	private boolean meleeHotkeyPressed = false;
 
 
-	boolean wheelActive()
-	{
-		return config.pingInputMode() == PingInputMode.PING_WHEEL;
-	}
 
 	boolean inParty()
 	{
@@ -538,15 +328,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 	@Subscribe
 	public void onMenuOptionClicked(MenuOptionClicked event)
 	{
-		if (wheelActive())
-		{
-			return;
-		}
-
-		boolean hotkeyPressed = defaultHotkeyPressed || avoidHotkeyPressed || cautionHotkeyPressed || questionHotkeyPressed
-			|| attackHotkeyPressed || defendHotkeyPressed || mageHotkeyPressed || rangeHotkeyPressed || meleeHotkeyPressed;
-
-		if (!hotkeyPressed || client.isMenuOpen())
+		if (latchedPing == null || client.isMenuOpen())
 		{
 			return;
 		}
@@ -577,33 +359,38 @@ public class PartyPingsExtendedPlugin extends Plugin
 			return;
 		}
 
-		PingType pingType = PingType.DEFAULT;
-		if (defaultHotkeyPressed) {
-			pingType = PingType.DEFAULT;
-		}
-		else if (avoidHotkeyPressed) {
-			pingType = PingType.AVOID;
-		}
-		else if (cautionHotkeyPressed) {
-			pingType = PingType.CAUTION;
-		}
-		else if (questionHotkeyPressed) {
-			pingType = PingType.QUESTION;
-		}
-		else if (attackHotkeyPressed) {
-			pingType = PingType.ATTACK;
-		}
-		else if (defendHotkeyPressed) {
-			pingType = PingType.DEFEND;
-		}
-		else if (mageHotkeyPressed) {
-			pingType = PingType.MAGE;
-		}
-		else if (rangeHotkeyPressed) {
-			pingType = PingType.RANGE;
-		}
-		else if (meleeHotkeyPressed) {
-			pingType = PingType.MELEE;
+		PingType pingType;
+		switch (latchedPing)
+		{
+			case DEFAULT:
+				pingType = PingType.DEFAULT;
+				break;
+			case AVOID:
+				pingType = PingType.AVOID;
+				break;
+			case CAUTION:
+				pingType = PingType.CAUTION;
+				break;
+			case QUESTION:
+				pingType = PingType.QUESTION;
+				break;
+			case ATTACK:
+				pingType = PingType.ATTACK;
+				break;
+			case DEFEND:
+				pingType = PingType.DEFEND;
+				break;
+			case MAGE:
+				pingType = PingType.MAGE;
+				break;
+			case RANGE:
+				pingType = PingType.RANGE;
+				break;
+			case MELEE:
+				pingType = PingType.MELEE;
+				break;
+			default:
+				return;
 		}
 
 		event.consume();
@@ -615,26 +402,6 @@ public class PartyPingsExtendedPlugin extends Plugin
 	//ping wheel mode
 	private final HotkeyListener wheelHotkeyListener = new HotkeyListener(() -> config.pingWheelHotkey())
 	{
-		@Override
-		public void keyPressed(java.awt.event.KeyEvent e)
-		{
-			if (!wheelActive())
-			{
-				return;
-			}
-			super.keyPressed(e);
-		}
-
-		@Override
-		public void keyTyped(java.awt.event.KeyEvent e)
-		{
-			if (!wheelActive())
-			{
-				return;
-			}
-			super.keyTyped(e);
-		}
-
 		@Override
 		public void hotkeyPressed()
 		{
@@ -784,13 +551,6 @@ public class PartyPingsExtendedPlugin extends Plugin
 		{
 			return;
 		}
-
-		final long now = System.currentTimeMillis();
-		if (now - lastSendAt < SEND_COOLDOWN_MS)
-		{
-			return;
-		}
-		lastSendAt = now;
 
 		// DEFAULT is a plain built-in ping: tile and sound only, no glyph
 		if (type == PingType.DEFAULT)

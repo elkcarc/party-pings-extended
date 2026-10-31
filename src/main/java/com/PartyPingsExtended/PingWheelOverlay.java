@@ -216,7 +216,7 @@ class PingWheelOverlay extends Overlay
 	public Dimension render(Graphics2D graphics)
 	{
 		final PartyPingsExtendedPlugin.WheelSession session = plugin.getWheelSession();
-		if (session == null || !plugin.wheelActive() || !plugin.inParty())
+		if (session == null || !plugin.inParty())
 		{
 			return null;
 		}

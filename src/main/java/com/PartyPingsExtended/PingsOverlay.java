@@ -142,10 +142,6 @@ class PingsOverlay extends Overlay
         }
     }
 
-    void clearGlyphCache()
-    {
-    }
-
     static BufferedImage tint(BufferedImage src, Color color) //recolor based on party color helper
     {
         int w = src.getWidth();
