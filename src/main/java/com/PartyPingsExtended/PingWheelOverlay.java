@@ -9,7 +9,6 @@ import java.awt.geom.Area;
 import java.awt.geom.Ellipse2D;
 import java.awt.geom.Path2D;
 import java.awt.image.BufferedImage;
-import java.util.List;
 import javax.inject.Inject;
 import net.runelite.client.ui.overlay.Overlay;
 import net.runelite.client.ui.overlay.OverlayLayer;
@@ -18,13 +17,15 @@ import net.runelite.client.util.ImageUtil;
 
 /**
  * The radial ping menu, drawn at the cursor while the wheel hotkey is held,
- * and only while in a party. Inspired by the implementation at https://github.com/oshaunbeck/better-pings-extension
+ * and only while in a party. The wheel's geometry (hub, slitted rim segments,
+ * hover bands) is built once when the wheel opens and stored on the session;
+ * every frame only fills the frozen shapes and blits cached glyphs. Inspired
+ * by the implementation at https://github.com/oshaunbeck/better-pings-extension
  */
 class PingWheelOverlay extends Overlay
 {
-	private static final int STROKE_WIDTH = 1;
-	private static final float HOVER_STROKE = 2f;
-	private static final double GAP_WIDTH = 4.0; // constant pixel width of the gaps between segments
+	// glyph scaling: the outer radius the art is authored for, and the fixed
+	// shrink that makes icons sit inside their segments at any diameter
 	private static final double ICON_REF_OUTER = 60.0;
 	private static final double ICON_SHRINK = 0.8;
 
@@ -40,7 +41,7 @@ class PingWheelOverlay extends Overlay
 	private final BufferedImage RANGE;
 	private final BufferedImage MELEE;
 
-	// Cached wheel glyphs to display on the wheel
+	// Cached wheel glyphs to display on the wheel, keyed by type:color:scale
 	private final java.util.Map<String, BufferedImage> tintedGlyphs = new java.util.concurrent.ConcurrentHashMap<>();
 
 	void clearGlyphCache()
@@ -66,7 +67,10 @@ class PingWheelOverlay extends Overlay
 		MELEE = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/Melee.png");
 	}
 
-	private BufferedImage icon(final PingType type)
+	// the glyph for a type: base PNG, tinted to the ping's carried color when
+	// recoloring is enabled (per-client choice), rescaled once per distinct
+	// (type, color, scale) and cached - never per frame
+	private BufferedImage icon(final PartyPingsExtendedPlugin.WheelSession session, final PingType type)
 	{
 		final BufferedImage base;
 		switch (type)
@@ -102,11 +106,10 @@ class PingWheelOverlay extends Overlay
 				return null;
 		}
 
-		// one cache entry per (type, color-or-none, scale)
+		// glyphs scale with the wheel, shrunk by the fixed factor
+		final double scale = (session.geom.outer / ICON_REF_OUTER) * ICON_SHRINK;
 		final boolean recolor = config.recolorGlyphs() && PingsOverlay.isRecolorable(type);
 		final Color c = recolor ? plugin.myColor() : null;
-		// glyphs scale with the wheel, shrunk by the fixed factor
-		final double scale = (plugin.wheelOuter() / ICON_REF_OUTER) * ICON_SHRINK;
 		final String key = type.name() + ":" + (c == null ? "-" : Integer.toString(c.getRGB() & 0xFFFFFF))
 			+ ":" + Math.round(scale * 100);
 		return tintedGlyphs.computeIfAbsent(key, k ->
@@ -123,7 +126,6 @@ class PingWheelOverlay extends Overlay
 		final int h = src.getHeight();
 		final int dw = Math.max(1, (int) Math.round(w * s));
 		final int dh = Math.max(1, (int) Math.round(h * s));
-
 		final double[] mid = new double[h * dw * 4];
 		for (int y = 0; y < h; y++)
 		{
@@ -131,8 +133,7 @@ class PingWheelOverlay extends Overlay
 			{
 				final double cxPix = (x + 0.5) / s - 0.5;
 				final int ix = (int) Math.floor(cxPix);
-				double wSum = 0;
-				double rSum = 0, gSum = 0, bSum = 0, aSum = 0;
+				double wSum = 0, rSum = 0, gSum = 0, bSum = 0, aSum = 0;
 				for (int k = -1; k <= 2; k++)
 				{
 					final double wt = catmullRom(cxPix - (ix + k));
@@ -145,13 +146,12 @@ class PingWheelOverlay extends Overlay
 					aSum += wt * a;
 				}
 				final int base = (y * dw + x) * 4;
-				mid[base] = rSum;
-				mid[base + 1] = gSum;
-				mid[base + 2] = bSum;
-				mid[base + 3] = aSum;
+				mid[base] = wSum == 0 ? 0 : rSum / wSum;
+				mid[base + 1] = wSum == 0 ? 0 : gSum / wSum;
+				mid[base + 2] = wSum == 0 ? 0 : bSum / wSum;
+				mid[base + 3] = wSum == 0 ? 0 : aSum / wSum;
 			}
 		}
-
 		final BufferedImage out = new BufferedImage(dw, dh, BufferedImage.TYPE_INT_ARGB);
 		for (int y = 0; y < dh; y++)
 		{
@@ -169,7 +169,6 @@ class PingWheelOverlay extends Overlay
 					bSum += wt * mid[base + 2];
 					aSum += wt * mid[base + 3];
 				}
-
 				final double aAvg = aSum;
 				if (aAvg <= 0.5)
 				{
@@ -212,6 +211,8 @@ class PingWheelOverlay extends Overlay
 		return v < 0 ? 0 : (v > 255 ? 255 : v);
 	}
 
+	// the wheel blits geometry that was built once when it opened: no clipping,
+	// subtraction or polygon math runs per frame anymore, only fills and blits
 	@Override
 	public Dimension render(Graphics2D graphics)
 	{
@@ -243,115 +244,44 @@ class PingWheelOverlay extends Overlay
 			}
 		}
 
-		final int cx = session.center.x;
-		final int cy = session.center.y;
-		final List<PingType> types = session.types;
-		final PingType hovered = plugin.hoveredType(session);
-		final double outer = plugin.wheelOuter();
-		final double inner = plugin.wheelHub() + GAP_WIDTH;
+		final PartyPingsExtendedPlugin.WheelGeom g = session.geom;
 
+		// hub: fill, then its border at the hover or resting width
+		final boolean centerHovered = g.hubFill.contains(session.drag);
+		graphics.setColor(centerHovered ? config.wheelHoverColor() : config.wheelBackground());
+		graphics.fill(g.hubFill);
+		graphics.setColor(centerHovered ? config.wheelHoverBorder() : config.wheelBorderColor());
+		graphics.fill(centerHovered ? g.hubBorderHover : g.hubBorder);
 
 		final PingType quick = config.quickPing();
-		final boolean centerHovered = plugin.aimIsCenter(session);
-		final double hub = inner - GAP_WIDTH;
-		final double hubBw = centerHovered ? HOVER_STROKE : STROKE_WIDTH;
-		final Ellipse2D hubCircle = new Ellipse2D.Double(cx - hub, cy - hub, hub * 2, hub * 2);
-		final Area hubBorder = new Area(hubCircle);
-		hubBorder.subtract(new Area(new Ellipse2D.Double(cx - (hub - hubBw), cy - (hub - hubBw),
-			(hub - hubBw) * 2, (hub - hubBw) * 2)));
-		graphics.setColor(centerHovered ? config.wheelHoverColor() : config.wheelBackground());
-		graphics.fill(hubCircle);
-		graphics.setColor(centerHovered ? config.wheelHoverBorder() : config.wheelBorderColor());
-		graphics.fill(hubBorder);
-		final BufferedImage quickGlyph = icon(quick);
-		if (quickGlyph != null) //scale with the wheel size
+		final BufferedImage quickGlyph = icon(session, quick);
+		if (quickGlyph != null) // scale with the wheel size
 		{
-			graphics.drawImage(quickGlyph, cx - quickGlyph.getWidth() / 2, cy - quickGlyph.getHeight() / 2, null);
+			graphics.drawImage(quickGlyph, session.center.x - quickGlyph.getWidth() / 2,
+				session.center.y - quickGlyph.getHeight() / 2, null);
 		}
 
-		if (!types.isEmpty())
+		// rim segments: fill + border fills from the frozen geometry, glyph at
+		// the segment's frozen mid-angle position
+		final double iconRadius = (g.inner + g.outer) / 2 + 2;
+		for (final PartyPingsExtendedPlugin.WheelSegment seg : g.segments)
 		{
-			drawRim(graphics, cx, cy, types, hovered, outer, inner);
-		}
+			final boolean hovered = seg.fill.contains(session.drag);
+			graphics.setColor(hovered ? config.wheelHoverColor() : config.wheelBackground());
+			graphics.fill(seg.fill);
+			graphics.setColor(hovered ? config.wheelHoverBorder() : config.wheelBorderColor());
+			graphics.fill(hovered ? seg.borderHover : seg.border);
 
-		return null;
-	}
-
-	//divided evenly among however many options are enabled; a single option displays as a full ring
-	private void drawRim(final Graphics2D graphics, final int cx, final int cy, final List<PingType> types,
-						 final PingType hovered, final double outer, final double inner)
-	{
-		final int count = types.size();
-		final double halfGap = GAP_WIDTH / 2.0;
-
-		for (int i = 0; i < count; i++)
-		{
-			final PingType type = types.get(i);
-			final double centerDeg = -90 + (360.0 / count) * i; // screen angle of the segment center, clockwise from top
-			final double bw = hovered == type ? HOVER_STROKE : STROKE_WIDTH; // border band width
-
-			// the segment's fillable area
-			final Area fill = new Area(new Ellipse2D.Double(cx - outer, cy - outer, outer * 2, outer * 2));
-			fill.subtract(new Area(new Ellipse2D.Double(cx - inner, cy - inner, inner * 2, inner * 2)));
-			if (count > 1)
-			{
-				// constant-width slit
-				fill.intersect(halfPlane(cx, cy, centerDeg - 180.0 / count, centerDeg, halfGap));
-				fill.intersect(halfPlane(cx, cy, centerDeg + 180.0 / count, centerDeg, halfGap));
-			}
-
-			final Area shrunk = new Area(new Ellipse2D.Double(cx - (outer - bw), cy - (outer - bw),
-				(outer - bw) * 2, (outer - bw) * 2));
-			shrunk.subtract(new Area(new Ellipse2D.Double(cx - (inner + bw), cy - (inner + bw),
-				(inner + bw) * 2, (inner + bw) * 2)));
-			if (count > 1)
-			{
-				shrunk.intersect(halfPlane(cx, cy, centerDeg - 180.0 / count, centerDeg, halfGap + bw));
-				shrunk.intersect(halfPlane(cx, cy, centerDeg + 180.0 / count, centerDeg, halfGap + bw));
-			}
-			final Area border = new Area(fill);
-			border.subtract(shrunk);
-
-			graphics.setColor(hovered == type ? config.wheelHoverColor() : config.wheelBackground());
-			graphics.fill(fill);
-			graphics.setColor(hovered == type ? config.wheelHoverBorder() : config.wheelBorderColor());
-			graphics.fill(border);
-
-			final double rad = Math.toRadians(centerDeg);
-			final double iconRadius = (inner + outer) / 2 + 2;
-			final int ix = (int) Math.round(cx + Math.cos(rad) * iconRadius);
-			final int iy = (int) Math.round(cy + Math.sin(rad) * iconRadius);
-			final BufferedImage glyph = icon(type);
-			if (glyph != null) //scale with the wheel size
+			final double rad = Math.toRadians(seg.centerDeg);
+			final int ix = (int) Math.round(session.center.x + Math.cos(rad) * iconRadius);
+			final int iy = (int) Math.round(session.center.y + Math.sin(rad) * iconRadius);
+			final BufferedImage glyph = icon(session, seg.type);
+			if (glyph != null) // scale with the wheel size
 			{
 				graphics.drawImage(glyph, ix - glyph.getWidth() / 2, iy - glyph.getHeight() / 2, null);
 			}
 		}
-	}
 
-	//helper to get even gaps around the rim (inside to outside)
-	private static Area halfPlane(final double cx, final double cy, final double lineDeg,
-								final double inwardDeg, final double offset)
-	{
-		final double lx = Math.cos(Math.toRadians(lineDeg));
-		final double ly = Math.sin(Math.toRadians(lineDeg));
-		// unit perpendicular of the boundary, pointing onto the inwardDeg side
-		double ux = -ly;
-		double uy = lx;
-		if (ux * Math.cos(Math.toRadians(inwardDeg)) + uy * Math.sin(Math.toRadians(inwardDeg)) < 0)
-		{
-			ux = -ux;
-			uy = -uy;
-		}
-		final double px = cx + ux * offset;
-		final double py = cy + uy * offset;
-		final double L = 1000;
-		final Path2D poly = new Path2D.Double();
-		poly.moveTo(px + lx * L, py + ly * L);
-		poly.lineTo(px - lx * L, py - ly * L);
-		poly.lineTo(px - lx * L + ux * L, py - ly * L + uy * L);
-		poly.lineTo(px + lx * L + ux * L, py + ly * L + uy * L);
-		poly.closePath();
-		return new Area(poly);
+		return null;
 	}
 }

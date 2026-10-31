@@ -45,9 +45,15 @@ import net.runelite.client.input.KeyManager;
 public class PartyPingsExtendedPlugin extends Plugin
 {
 
-	// default wheel geometry
+	// default wheel geometry (proportions of the default 176 px wheel)
 	static final int WHEEL_RADIUS = 88;
 	static final int WHEEL_DEAD_ZONE = 30;
+
+	// border band widths (resting / hover) and the constant slit width between
+	// neighboring rim segments, in wheel pixels
+	static final int STROKE_WIDTH = 1;
+	static final float HOVER_STROKE = 2f;
+	static final double GAP_WIDTH = 4.0;
 
 	@Inject
 	private Client client;
@@ -411,7 +417,11 @@ public class PartyPingsExtendedPlugin extends Plugin
 				if (tile != null && mouse != null && mouse.getX() != -1)
 				{
 					java.awt.Point aim = new java.awt.Point(mouse.getX(), mouse.getY());
-					wheelSession = new WheelSession(aim, tile.getWorldLocation(), enabledTypes());
+					// all geometry built once, here, at open time
+					final List<PingType> types = enabledTypes();
+					final double outer = wheelOuter();
+					final double hub = wheelHub();
+					wheelSession = new WheelSession(aim, tile.getWorldLocation(), buildGeom(aim, types, hub, hub + GAP_WIDTH, outer));
 				}
 			}
 		}
@@ -423,11 +433,8 @@ public class PartyPingsExtendedPlugin extends Plugin
 			if (session != null)
 			{
 				wheelSession = null;
-				PingType selected = hoveredType(session);
-				if (selected == null) // aimed at the center, send quick ping
-				{
-					selected = config.quickPing();
-				}
+				final WheelSegment seg = hoveredSegment(session);
+				PingType selected = seg == null ? config.quickPing() : seg.type;
 				if (selected != null)
 				{
 					sendPing(selected, session.target);
@@ -487,23 +494,161 @@ public class PartyPingsExtendedPlugin extends Plugin
 		return types;
 	}
 
-	//wheel segment selection handler
-	PingType hoveredType(WheelSession session)
+	// per-segment geometry frozen at open time: the segment's wedge fill, its
+	// border band at resting width and at hover width, and the wedge's center
+	// angle (for glyph placement). The hub is a segment too (type DEFAULT).
+	static class WheelSegment
 	{
-		if (aimIsCenter(session) || session.types.isEmpty())
+		final PingType type;
+		final java.awt.Shape fill;
+		final java.awt.Shape border;
+		final java.awt.Shape borderHover;
+		final double centerDeg;
+
+		WheelSegment(PingType type, java.awt.Shape fill, java.awt.Shape border, java.awt.Shape borderHover, double centerDeg)
+		{
+			this.type = type;
+			this.fill = fill;
+			this.border = border;
+			this.borderHover = borderHover;
+			this.centerDeg = centerDeg;
+		}
+	}
+
+	// All wheel geometry, built ONCE when the wheel opens (never per frame):
+	// the hub disc and its borders, the enabled rim segments, and the radii
+	// they were built with. Hit-testing uses the same fill areas via contains(),
+	// so visual and selection boundaries cannot drift apart.
+	static class WheelGeom
+	{
+		final java.awt.Shape hubFill;
+		final java.awt.Shape hubBorder;
+		final java.awt.Shape hubBorderHover;
+		final java.util.List<WheelSegment> segments;
+		final double hub;
+		final double inner;
+		final double outer;
+
+		WheelGeom(java.awt.Shape hubFill, java.awt.Shape hubBorder, java.awt.Shape hubBorderHover,
+				  java.util.List<WheelSegment> segments, double hub, double inner, double outer)
+		{
+			this.hubFill = hubFill;
+			this.hubBorder = hubBorder;
+			this.hubBorderHover = hubBorderHover;
+			this.segments = segments;
+			this.hub = hub;
+			this.inner = inner;
+			this.outer = outer;
+		}
+	}
+
+	// build every shape the open wheel needs: hub disc + ring borders, then one
+	// wedge per enabled type, constant-width slits via paired half-plane clips
+	static WheelGeom buildGeom(java.awt.Point center, java.util.List<PingType> types, double hub, double inner, double outer)
+	{
+		final int cx = center.x;
+		final int cy = center.y;
+		final int count = types.size();
+		final double halfGap = GAP_WIDTH / 2.0;
+		final double bw = STROKE_WIDTH;
+		final double bhb = HOVER_STROKE;
+
+		final java.awt.geom.Ellipse2D hubCircle = new java.awt.geom.Ellipse2D.Double(cx - hub, cy - hub, hub * 2, hub * 2);
+		final java.awt.geom.Area hubBorder = new java.awt.geom.Area(hubCircle);
+		hubBorder.subtract(new java.awt.geom.Area(new java.awt.geom.Ellipse2D.Double(
+			cx - (hub - bw), cy - (hub - bw), (hub - bw) * 2, (hub - bw) * 2)));
+		final java.awt.geom.Area hubBorderHover = new java.awt.geom.Area(hubCircle);
+		hubBorderHover.subtract(new java.awt.geom.Area(new java.awt.geom.Ellipse2D.Double(
+			cx - (hub - bhb), cy - (hub - bhb), (hub - bhb) * 2, (hub - bhb) * 2)));
+
+		final java.util.List<WheelSegment> segments = new ArrayList<>();
+		for (int i = 0; i < count; i++)
+		{
+			final double centerDeg = -90 + (360.0 / count) * i;
+			final java.awt.geom.Area fill = new java.awt.geom.Area(new java.awt.geom.Ellipse2D.Double(
+				cx - outer, cy - outer, outer * 2, outer * 2));
+			fill.subtract(new java.awt.geom.Area(new java.awt.geom.Ellipse2D.Double(
+				cx - inner, cy - inner, inner * 2, inner * 2)));
+			if (count > 1)
+			{
+				// constant-width slit: clip the same boundary line in opposite
+				// directions for the two neighbors, each by halfGap
+				fill.intersect(halfPlane(cx, cy, centerDeg - 180.0 / count, centerDeg, halfGap));
+				fill.intersect(halfPlane(cx, cy, centerDeg + 180.0 / count, centerDeg, halfGap));
+			}
+
+			final java.awt.geom.Area border = wedgeRing(cx, cy, outer - bw, inner + bw, count, centerDeg, halfGap + bw);
+			final java.awt.geom.Area borderHover = wedgeRing(cx, cy, outer - bhb, inner + bhb, count, centerDeg, halfGap + bhb);
+			segments.add(new WheelSegment(types.get(i), fill, border, borderHover, centerDeg));
+		}
+		return new WheelGeom(hubCircle, hubBorder, hubBorderHover, segments, hub, inner, outer);
+	}
+
+	// a ring wedge (full ring when single-option) for a segment's border band
+	private static java.awt.geom.Area wedgeRing(int cx, int cy, double outer, double inner, int count, double centerDeg, double inset)
+	{
+		final java.awt.geom.Area ring = new java.awt.geom.Area(new java.awt.geom.Ellipse2D.Double(
+			cx - outer, cy - outer, outer * 2, outer * 2));
+		ring.subtract(new java.awt.geom.Area(new java.awt.geom.Ellipse2D.Double(
+			cx - inner, cy - inner, inner * 2, inner * 2)));
+		if (count > 1)
+		{
+			ring.intersect(halfPlane(cx, cy, centerDeg - 180.0 / count, centerDeg, inset));
+			ring.intersect(halfPlane(cx, cy, centerDeg + 180.0 / count, centerDeg, inset));
+		}
+		return ring;
+	}
+
+	// wheel segment selection: hub hit means the quick ping (null); otherwise
+	// the segment whose frozen fill contains the aim; beyond the rim, the angle
+	// fallback keeps the selection tracking the cursor direction
+	WheelSegment hoveredSegment(WheelSession session)
+	{
+		final WheelGeom g = session.geom;
+		if (g.hubFill.contains(session.drag))
 		{
 			return null; // the center selects the quick ping
 		}
+		for (WheelSegment seg : g.segments)
+		{
+			if (seg.fill.contains(session.drag))
+			{
+				return seg;
+			}
+		}
+		if (g.segments.isEmpty())
+		{
+			return null;
+		}
+		final double segment = 360.0 / g.segments.size();
+		final double angle = Math.toDegrees(Math.atan2(session.drag.y - session.center.y, session.drag.x - session.center.x));
+		return g.segments.get((int) Math.floor((((angle + 90 + segment / 2) % 360) + 360) % 360 / segment));
+	}
 
-		final java.awt.Point drag = session.drag;
-		final int dx = drag.x - session.center.x;
-		final int dy = drag.y - session.center.y;
-
-		final List<PingType> types = session.types;
-		final double segment = 360.0 / types.size();
-		final double angle = Math.toDegrees(Math.atan2(dy, dx));
-		final int index = (int) Math.floor((((angle + 90 + segment / 2) % 360) + 360) % 360 / segment);
-		return types.get(index);
+	// helper to get even gaps around the rim (inside to outside)
+	static java.awt.geom.Area halfPlane(final double cx, final double cy, final double lineDeg,
+									   final double inwardDeg, final double offset)
+	{
+		final double lx = Math.cos(Math.toRadians(lineDeg));
+		final double ly = Math.sin(Math.toRadians(lineDeg));
+		// unit perpendicular of the boundary, pointing onto the inwardDeg side
+		double ux = -ly;
+		double uy = lx;
+		if (ux * Math.cos(Math.toRadians(inwardDeg)) + uy * Math.sin(Math.toRadians(inwardDeg)) < 0)
+		{
+			ux = -ux;
+			uy = -uy;
+		}
+		final double px = cx + ux * offset;
+		final double py = cy + uy * offset;
+		final double L = 1000;
+		final java.awt.geom.Path2D poly = new java.awt.geom.Path2D.Double();
+		poly.moveTo(px + lx * L, py + ly * L);
+		poly.lineTo(px - lx * L, py - ly * L);
+		poly.lineTo(px - lx * L + ux * L, py - ly * L + uy * L);
+		poly.lineTo(px + lx * L + ux * L, py + ly * L + uy * L);
+		poly.closePath();
+		return new java.awt.geom.Area(poly);
 	}
 
 	double wheelOuter()
@@ -517,31 +662,23 @@ public class PartyPingsExtendedPlugin extends Plugin
 		return wheelOuter() * WHEEL_DEAD_ZONE / (double) WHEEL_RADIUS;
 	}
 
-	boolean aimIsCenter(WheelSession session)
-	{
-		final java.awt.Point drag = session.drag;
-		final double dx = drag.x - session.center.x;
-		final double dy = drag.y - session.center.y;
-		final double hub = wheelHub();
-		return dx * dx + dy * dy < hub * hub;
-	}
-
+	// the state of one open wheel: fixed center and target tile, plus the
+	// geometry built once at open time and the live aim point
 	static class WheelSession
 	{
 		final java.awt.Point center;
 		final WorldPoint target;
-		final List<PingType> types;
+		final WheelGeom geom;
 		volatile java.awt.Point drag;
 
-		WheelSession(java.awt.Point center, WorldPoint target, List<PingType> types)
+		WheelSession(java.awt.Point center, WorldPoint target, WheelGeom geom)
 		{
 			this.center = center;
 			this.target = target;
-			this.types = types;
+			this.geom = geom;
 			this.drag = center;
 		}
 	}
-
 
 	private void sendPing(PingType type, WorldPoint point)
 	{
