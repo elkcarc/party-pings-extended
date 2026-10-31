@@ -6,7 +6,7 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 
-
+//client side data for storing information about recieved pings
 @RequiredArgsConstructor
 @Getter
 class PartyTilePingDataExtended {

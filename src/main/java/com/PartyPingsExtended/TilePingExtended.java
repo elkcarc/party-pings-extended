@@ -5,7 +5,7 @@ import lombok.Value;
 import net.runelite.api.coords.WorldPoint;
 import net.runelite.client.party.messages.PartyMemberMessage;
 
-//Ping Information. Carries what's needed to draw the final glyph over the regular party plugin's ping.
+//Ping Information (the package that is actually sent over the party system). Carries what's needed to draw the glyph.
 @Value
 public class TilePingExtended extends PartyMemberMessage{
     private final WorldPoint point;
