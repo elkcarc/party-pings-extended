@@ -6,8 +6,8 @@ import java.awt.Dimension;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.geom.Area;
-import java.awt.geom.Arc2D;
 import java.awt.geom.Ellipse2D;
+import java.awt.geom.Path2D;
 import java.awt.image.BufferedImage;
 import java.util.List;
 import javax.inject.Inject;
@@ -23,15 +23,20 @@ import net.runelite.client.util.ImageUtil;
  * never disagree. The blank center circle always renders (it carries the quick
  * ping's glyph when one is set; that type is then excluded from the rim), and
  * the rim divides evenly among the enabled options - down to none, where only
- * the center circle shows. Colors and transparency come from the appearance
- * config. Icons are the same glyph PNGs the scene overlay uses, tinted to the
- * sender's party color (carried in the ping message) when this client has
- * glyph recoloring enabled, so the wheel ships no extra art.
+ * the center circle shows. Gaps between segments are slits of constant width
+ * from the inner edge of the donut to the outer edge. Colors and transparency
+ * come from the appearance config. Icons are the same glyph PNGs the scene
+ * overlay uses, tinted to the sender's party color (carried in the ping
+ * message) when this client has glyph recoloring enabled, so the wheel ships
+ * no extra art.
  */
 class PingWheelOverlay extends Overlay
 {
 	private static final int STROKE_WIDTH = 1;
 	private static final float HOVER_STROKE = 2f;
+	// constant pixel width of the slit between neighboring segments, measured
+	// perpendicular to the slit at every radius
+	private static final double GAP_WIDTH = 4.0;
 
 	private final net.runelite.api.Client client;
 	private final PartyPingsExtendedPlugin plugin;
@@ -191,32 +196,35 @@ class PingWheelOverlay extends Overlay
 	}
 
 	// the rim: divided evenly among however many options are enabled; a single
-	// option is a full ring styled exactly like a segment of a multi-segment rim
+	// option is a full ring styled exactly like a segment of a multi-segment rim.
+	// The slit between neighboring segments has a constant pixel width at every
+	// radius: each segment is the hub-cut disc clipped by the two half-planes
+	// whose boundaries are the raw sector lines, each shifted GAP_WIDTH/2 away
+	// from the segment - two parallel straight edges, gap uniform inside to out
 	private void drawRim(final Graphics2D graphics, final int cx, final int cy, final List<PingType> types,
 						 final PingType hovered, final double outer, final double inner)
 	{
-		final Area innerCut = new Area(new Ellipse2D.Double(cx - inner, cy - inner, inner * 2, inner * 2));
-		final double segmentDeg = 360.0 / types.size();
 		final int count = types.size();
+		final double halfGap = GAP_WIDTH / 2.0;
 
 		for (int i = 0; i < count; i++)
 		{
 			final PingType type = types.get(i);
-			final double centerDeg = -90 + segmentDeg * i; // screen angle of the segment center, clockwise from top
+			final double centerDeg = -90 + (360.0 / count) * i; // screen angle of the segment center, clockwise from top
 
-			final Area segment;
-			if (count == 1)
+			final Area segment = new Area(new Ellipse2D.Double(cx - outer, cy - outer, outer * 2, outer * 2));
+			// the segment lives on the donut band only: the hub disc stays cut
+			// out of every segment
+			segment.subtract(new Area(new Ellipse2D.Double(cx - inner, cy - inner, inner * 2, inner * 2)));
+
+			if (count > 1)
 			{
-				// full ring: the whole disc minus the center, no seam
-				segment = new Area(new Ellipse2D.Double(cx - outer, cy - outer, outer * 2, outer * 2));
-				segment.subtract(innerCut);
-			}
-			else
-			{
-				final double arcStart = -centerDeg - segmentDeg / 2; // Java2D arcs are counter-clockwise
-				segment = new Area(new Arc2D.Double(
-					cx - outer, cy - outer, outer * 2, outer * 2, arcStart + 1.5, segmentDeg - 3, Arc2D.PIE));
-				segment.subtract(innerCut);
+				// raw sector boundary lines through the center, at the two
+				// midpoints flanking this segment; clip each side to the
+				// half-plane on the segment's side of that line, offset
+				// half a gap so neighboring fills share a constant-width slit
+				segment.intersect(halfPlane(cx, cy, centerDeg - 180.0 / count, centerDeg, halfGap));
+				segment.intersect(halfPlane(cx, cy, centerDeg + 180.0 / count, centerDeg, halfGap));
 			}
 
 			final boolean isHovered = type == hovered;
@@ -234,5 +242,28 @@ class PingWheelOverlay extends Overlay
 			final BufferedImage glyph = icon(type);
 			graphics.drawImage(glyph, ix - glyph.getWidth() / 2, iy - glyph.getHeight() / 2, null);
 		}
+	}
+
+	// the half-plane on the inward side of the (imaginary) line at angle
+	// lineDeg through the center, shifted `offset` pixels toward inwardDeg;
+	// rendered as a polygon far larger than the wheel so the clip is exact
+	// across the whole disc
+	private static Area halfPlane(final double cx, final double cy, final double lineDeg,
+								final double inwardDeg, final double offset)
+	{
+		final double ex = Math.cos(Math.toRadians(lineDeg));
+		final double ey = Math.sin(Math.toRadians(lineDeg));
+		final double nx = Math.cos(Math.toRadians(inwardDeg));
+		final double ny = Math.sin(Math.toRadians(inwardDeg));
+		final double px = cx + nx * offset;
+		final double py = cy + ny * offset;
+		final double L = 1000;
+		final Path2D poly = new Path2D.Double();
+		poly.moveTo(px + ex * L, py + ey * L);
+		poly.lineTo(px - ex * L, py - ey * L);
+		poly.lineTo(px - ex * L + nx * L, py - ey * L + ny * L);
+		poly.lineTo(px + ex * L + nx * L, py + ey * L + ny * L);
+		poly.closePath();
+		return new Area(poly);
 	}
 }

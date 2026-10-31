@@ -219,7 +219,7 @@ public interface PartyPingsExtendedConfig extends Config
 	)
 	default Color wheelBorderColor()
 	{
-		return new Color(255, 255, 255, 128);
+		return new Color(255, 255, 255, 0);
 	}
 
 	@Alpha
