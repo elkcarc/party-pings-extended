@@ -49,6 +49,12 @@ class PingWheelOverlay extends Overlay
 	// tinted once per glyph instead of on every render frame.
 	private final java.util.Map<String, BufferedImage> tintedGlyphs = new java.util.concurrent.ConcurrentHashMap<>();
 
+	// drop all cached tinted glyphs
+	void clearGlyphCache()
+	{
+		tintedGlyphs.clear();
+	}
+
 	@Inject
 	PingWheelOverlay(final net.runelite.api.Client client, final PartyPingsExtendedPlugin plugin, final PartyPingsExtendedConfig config)
 	{

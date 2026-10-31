@@ -139,9 +139,17 @@ public class PartyPingsExtendedPlugin extends Plugin
 		keyManager.unregisterKeyListener(wheelHotkeyListener);
 		overlayManager.remove(pingsOverlay);
 		overlayManager.remove(pingWheelOverlay);
+		clearGlyphCache();
 		wheelSession = null;
 		pendingTilePingsExtended.clear();
 		memberColors.clear();
+	}
+
+	// drop all cached tinted/faded glyph images
+	void clearGlyphCache()
+	{
+		pingsOverlay.clearGlyphCache();
+		pingWheelOverlay.clearGlyphCache();
 	}
 
 	@Subscribe
@@ -785,6 +793,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 		final Color color = memberColors.getOrDefault(local != null ? local.getMemberId() : -1L, Color.WHITE);
 		final PartyTilePingDataExtended data = new PartyTilePingDataExtended(point, type);
 		data.setColor(color);
+		data.setGlyph(pingsOverlay.prepareGlyph(type, color));
 		pendingTilePingsExtended.add(data);
 
 		party.send(new TilePing(point));
@@ -823,7 +832,9 @@ public class PartyPingsExtendedPlugin extends Plugin
 		}
 
 		PartyTilePingDataExtended data = new PartyTilePingDataExtended(event.getPoint(), event.getPingType());
-		data.setColor(memberColors.getOrDefault(event.getMemberId(), Color.WHITE));
+		final Color senderColor = memberColors.getOrDefault(event.getMemberId(), Color.WHITE);
+		data.setColor(senderColor);
+		data.setGlyph(pingsOverlay.prepareGlyph(event.getPingType(), senderColor));
 		pendingTilePingsExtended.add(data);
 	}
 }
