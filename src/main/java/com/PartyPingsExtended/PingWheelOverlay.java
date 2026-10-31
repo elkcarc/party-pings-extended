@@ -171,15 +171,22 @@ class PingWheelOverlay extends Overlay
 
 		// the center circle always renders, carrying the quick ping's glyph when
 		// one is set (that type is excluded from the rim); aiming at it is aiming
-		// at the quick ping, so it highlights like a segment
+		// at the quick ping, so it highlights like a segment. Its edge sits
+		// GAP_WIDTH away from the rim's inner edge, like every other gap
 		final PingType quick = config.quickPing().getPingType();
 		final boolean centerHovered = hovered == PingType.DEFAULT;
-		final double hub = PartyPingsExtendedPlugin.WHEEL_DEAD_ZONE - 4;
+		final double hub = inner - GAP_WIDTH;
+		final double hubBw = centerHovered ? HOVER_STROKE : STROKE_WIDTH;
+		final Ellipse2D hubCircle = new Ellipse2D.Double(cx - hub, cy - hub, hub * 2, hub * 2);
+		final Area hubBorder = new Area(hubCircle);
+		// the border band occupies the outermost bw pixels of the hub, fully
+		// inside it (inset geometry, not a clipped stroke)
+		hubBorder.subtract(new Area(new Ellipse2D.Double(cx - (hub - hubBw), cy - (hub - hubBw),
+			(hub - hubBw) * 2, (hub - hubBw) * 2)));
 		graphics.setColor(centerHovered ? config.wheelHoverColor() : config.wheelBackground());
-		graphics.fill(new Ellipse2D.Double(cx - hub, cy - hub, hub * 2, hub * 2));
+		graphics.fill(hubCircle);
 		graphics.setColor(centerHovered ? config.wheelHoverBorder() : config.wheelBorderColor());
-		graphics.setStroke(new BasicStroke(centerHovered ? HOVER_STROKE : STROKE_WIDTH));
-		graphics.draw(new Ellipse2D.Double(cx - hub, cy - hub, hub * 2, hub * 2));
+		graphics.fill(hubBorder);
 		if (quick != null)
 		{
 			// drawn at native pixel size, unscaled, exactly like a scene ping
@@ -211,28 +218,39 @@ class PingWheelOverlay extends Overlay
 		{
 			final PingType type = types.get(i);
 			final double centerDeg = -90 + (360.0 / count) * i; // screen angle of the segment center, clockwise from top
+			final double bw = hovered == type ? HOVER_STROKE : STROKE_WIDTH; // border band width
 
-			final Area segment = new Area(new Ellipse2D.Double(cx - outer, cy - outer, outer * 2, outer * 2));
-			// the segment lives on the donut band only: the hub disc stays cut
-			// out of every segment
-			segment.subtract(new Area(new Ellipse2D.Double(cx - inner, cy - inner, inner * 2, inner * 2)));
-
+			// the segment's fillable area: donut band between hub and outer
+			// edge, slit-clipped; for a single option the full ring, no seam
+			final Area fill = new Area(new Ellipse2D.Double(cx - outer, cy - outer, outer * 2, outer * 2));
+			fill.subtract(new Area(new Ellipse2D.Double(cx - inner, cy - inner, inner * 2, inner * 2)));
 			if (count > 1)
 			{
-				// raw sector boundary lines through the center, at the two
-				// midpoints flanking this segment; clip each side to the
-				// half-plane on the segment's side of that line, offset
-				// half a gap so neighboring fills share a constant-width slit
-				segment.intersect(halfPlane(cx, cy, centerDeg - 180.0 / count, centerDeg, halfGap));
-				segment.intersect(halfPlane(cx, cy, centerDeg + 180.0 / count, centerDeg, halfGap));
+				// constant-width slit: half-plane edges at halfGap from the raw
+				// sector line on each side
+				fill.intersect(halfPlane(cx, cy, centerDeg - 180.0 / count, centerDeg, halfGap));
+				fill.intersect(halfPlane(cx, cy, centerDeg + 180.0 / count, centerDeg, halfGap));
 			}
 
-			final boolean isHovered = type == hovered;
-			graphics.setColor(isHovered ? config.wheelHoverColor() : config.wheelBackground());
-			graphics.fill(segment);
-			graphics.setColor(isHovered ? config.wheelHoverBorder() : config.wheelBorderColor());
-			graphics.setStroke(new BasicStroke(isHovered ? HOVER_STROKE : STROKE_WIDTH));
-			graphics.draw(segment);
+			// the border is geometry, not a stroke: the same area shrunk by one
+			// border width on every edge; fill minus shrunk = a band that lies
+			// entirely inside the segment, visible in full, unclipped
+			final Area shrunk = new Area(new Ellipse2D.Double(cx - (outer - bw), cy - (outer - bw),
+				(outer - bw) * 2, (outer - bw) * 2));
+			shrunk.subtract(new Area(new Ellipse2D.Double(cx - (inner + bw), cy - (inner + bw),
+				(inner + bw) * 2, (inner + bw) * 2)));
+			if (count > 1)
+			{
+				shrunk.intersect(halfPlane(cx, cy, centerDeg - 180.0 / count, centerDeg, halfGap + bw));
+				shrunk.intersect(halfPlane(cx, cy, centerDeg + 180.0 / count, centerDeg, halfGap + bw));
+			}
+			final Area border = new Area(fill);
+			border.subtract(shrunk);
+
+			graphics.setColor(hovered == type ? config.wheelHoverColor() : config.wheelBackground());
+			graphics.fill(fill);
+			graphics.setColor(hovered == type ? config.wheelHoverBorder() : config.wheelBorderColor());
+			graphics.fill(border);
 
 			final double rad = Math.toRadians(centerDeg);
 			final double iconRadius = (inner + outer) / 2 + 2;
@@ -244,25 +262,35 @@ class PingWheelOverlay extends Overlay
 		}
 	}
 
-	// the half-plane on the inward side of the (imaginary) line at angle
-	// lineDeg through the center, shifted `offset` pixels toward inwardDeg;
-	// rendered as a polygon far larger than the wheel so the clip is exact
-	// across the whole disc
+	// the half-plane bounded by the line at angle lineDeg through the center,
+	// shifted perpendicular to itself by `offset` pixels onto the side facing
+	// inwardDeg. Adjacent segments clip the SAME boundary line in opposite
+	// directions by halfGap, so the slit between them is a channel of constant
+	// width; with fill and shrunk edges offset symmetrically about the shared
+	// boundary, the border thickness (fill edge to shrunk edge) is identical
+	// on the arcs and on the slit lines. Rendered as a polygon far larger than
+	// the wheel so the clip is exact across the whole disc
 	private static Area halfPlane(final double cx, final double cy, final double lineDeg,
 								final double inwardDeg, final double offset)
 	{
-		final double ex = Math.cos(Math.toRadians(lineDeg));
-		final double ey = Math.sin(Math.toRadians(lineDeg));
-		final double nx = Math.cos(Math.toRadians(inwardDeg));
-		final double ny = Math.sin(Math.toRadians(inwardDeg));
-		final double px = cx + nx * offset;
-		final double py = cy + ny * offset;
+		final double lx = Math.cos(Math.toRadians(lineDeg));
+		final double ly = Math.sin(Math.toRadians(lineDeg));
+		// unit perpendicular of the boundary, pointing onto the inwardDeg side
+		double ux = -ly;
+		double uy = lx;
+		if (ux * Math.cos(Math.toRadians(inwardDeg)) + uy * Math.sin(Math.toRadians(inwardDeg)) < 0)
+		{
+			ux = -ux;
+			uy = -uy;
+		}
+		final double px = cx + ux * offset;
+		final double py = cy + uy * offset;
 		final double L = 1000;
 		final Path2D poly = new Path2D.Double();
-		poly.moveTo(px + ex * L, py + ey * L);
-		poly.lineTo(px - ex * L, py - ey * L);
-		poly.lineTo(px - ex * L + nx * L, py - ey * L + ny * L);
-		poly.lineTo(px + ex * L + nx * L, py + ey * L + ny * L);
+		poly.moveTo(px + lx * L, py + ly * L);
+		poly.lineTo(px - lx * L, py - ly * L);
+		poly.lineTo(px - lx * L + ux * L, py - ly * L + uy * L);
+		poly.lineTo(px + lx * L + ux * L, py + ly * L + uy * L);
 		poly.closePath();
 		return new Area(poly);
 	}
