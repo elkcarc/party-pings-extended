@@ -240,8 +240,10 @@ class PingWheelOverlay extends Overlay
 
 		final PartyPingsExtendedPlugin.WheelGeom g = session.geom;
 
-		// hub: fill, then its border at the hover or resting width
-		final boolean centerHovered = g.hubFill.contains(session.drag);
+		// the segment that release would select (null = the center/quick ping)
+		// - highlight exactly that, wherever the aim lies
+		final PartyPingsExtendedPlugin.WheelSegment hoveredSeg = plugin.hoveredSegment(session);
+		final boolean centerHovered = hoveredSeg == null;
 		graphics.setColor(centerHovered ? config.wheelHoverColor() : config.wheelBackground());
 		graphics.fill(g.hubFill);
 		graphics.setColor(centerHovered ? config.wheelHoverBorder() : config.wheelBorderColor());
@@ -260,7 +262,7 @@ class PingWheelOverlay extends Overlay
 		final double iconRadius = (g.inner + g.outer) / 2 + 2;
 		for (final PartyPingsExtendedPlugin.WheelSegment seg : g.segments)
 		{
-			final boolean hovered = seg.fill.contains(session.drag);
+			final boolean hovered = hoveredSeg != null && hoveredSeg.type == seg.type;
 			graphics.setColor(hovered ? config.wheelHoverColor() : config.wheelBackground());
 			graphics.fill(seg.fill);
 			graphics.setColor(hovered ? config.wheelHoverBorder() : config.wheelBorderColor());
