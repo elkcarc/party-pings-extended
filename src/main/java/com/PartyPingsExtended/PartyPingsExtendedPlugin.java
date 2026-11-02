@@ -491,6 +491,10 @@ public class PartyPingsExtendedPlugin extends Plugin
 		{
 			types.add(PingType.MELEE);
 		}
+		if (config.wheelCancel() && quick != PingType.CANCEL)
+		{
+			types.add(PingType.CANCEL);
+		}
 		return types;
 	}
 
@@ -672,8 +676,14 @@ public class PartyPingsExtendedPlugin extends Plugin
 
 	private void sendPing(PingType type, WorldPoint point)
 	{
-		// outside a party, pings do nothing at all
+		// outside a party, pings do nothing
 		if (!party.isInParty())
+		{
+			return;
+		}
+
+		// CANCEL: nothing is sent
+		if (type == PingType.CANCEL)
 		{
 			return;
 		}

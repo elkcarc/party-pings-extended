@@ -165,6 +165,18 @@ public interface PartyPingsExtendedConfig extends Config
 		return true;
 	}
 
+	@ConfigItem(
+			keyName = "wheelCancel",
+			name = "Cancel",
+			description = "Show the cancel option on the wheel. Selecting it sends nothing.",
+			position = 16,
+			section = "pingWheelSection"
+	)
+	default boolean wheelCancel()
+	{
+		return false;
+	}
+
 	@ConfigSection(
 			name = "Wheel appearance",
 			description = "Colors and transparency of the ping wheel.",

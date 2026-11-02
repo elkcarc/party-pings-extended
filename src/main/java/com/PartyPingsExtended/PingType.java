@@ -9,5 +9,6 @@ public enum PingType {
 	DEFEND,
 	MAGE,
 	RANGE,
-	MELEE
+	MELEE,
+	CANCEL
 }

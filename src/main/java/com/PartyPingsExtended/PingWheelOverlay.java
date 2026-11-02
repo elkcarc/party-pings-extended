@@ -37,6 +37,7 @@ class PingWheelOverlay extends Overlay
 	private final BufferedImage MAGE;
 	private final BufferedImage RANGE;
 	private final BufferedImage MELEE;
+	private final BufferedImage CANCEL;
 
 	//Cached wheel glyphs to display on the wheel, keyed by type:color:scale
 	private final java.util.Map<String, BufferedImage> tintedGlyphs = new java.util.concurrent.ConcurrentHashMap<>();
@@ -62,6 +63,7 @@ class PingWheelOverlay extends Overlay
 		MAGE = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/Mage.png");
 		RANGE = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/Range.png");
 		MELEE = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/Melee.png");
+		CANCEL = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/cancelmark.png");
 	}
 
 	//the glyph for a type
@@ -96,6 +98,9 @@ class PingWheelOverlay extends Overlay
 				break;
 			case MELEE:
 				base = MELEE;
+				break;
+			case CANCEL:
+				base = CANCEL;
 				break;
 			default:
 				return null;
