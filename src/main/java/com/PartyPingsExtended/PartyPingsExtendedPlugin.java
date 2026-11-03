@@ -434,8 +434,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 	java.util.List<PingType> enabledTypes()
 	{
 		java.util.List<PingType> types = new ArrayList<>();
-		final PingType quick = config.quickPing();
-		if (config.wheelDefault() && quick != PingType.DEFAULT)
+		if (config.wheelDefault())
 		{
 			types.add(PingType.DEFAULT);
 		}
@@ -467,10 +466,13 @@ public class PartyPingsExtendedPlugin extends Plugin
 		{
 			types.add(PingType.MELEE);
 		}
-		if (config.wheelCancel() && quick != PingType.CANCEL)
+		if (config.wheelCancel())
 		{
 			types.add(PingType.CANCEL);
 		}
+		// the quick ping lives in the centre only, never on the rim, whichever
+		// type it happens to be
+		types.remove(config.quickPing());
 		return types;
 	}
 

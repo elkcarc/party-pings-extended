@@ -28,7 +28,7 @@ public interface PartyPingsExtendedConfig extends Config
 	@ConfigItem(
 			keyName = "fadeGlyphs",
 			name = "Fade Glyphs",
-			description = "Fade the glyphs out over time.
+			description = "Fade the glyphs out over time",
 			position = 3
 	)
 	default boolean fadeGlyphs()
