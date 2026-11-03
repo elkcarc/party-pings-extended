@@ -112,7 +112,6 @@ public class PartyPingsExtendedPlugin extends Plugin
 		wsClient.registerMessage(TilePing.class);
 		wsClient.registerMessage(TilePingExtended.class);
 		keyManager.registerKeyListener(defaultHotkeyListener);
-		keyManager.registerKeyListener(avoidHotkeyListener);
 		keyManager.registerKeyListener(cautionHotkeyListener);
 		keyManager.registerKeyListener(questionHotkeyListener);
 		keyManager.registerKeyListener(attackHotkeyListener);
@@ -131,7 +130,6 @@ public class PartyPingsExtendedPlugin extends Plugin
 		wsClient.unregisterMessage(TilePing.class);
 		wsClient.unregisterMessage(TilePingExtended.class);
 		keyManager.unregisterKeyListener(defaultHotkeyListener);
-		keyManager.unregisterKeyListener(avoidHotkeyListener);
 		keyManager.unregisterKeyListener(cautionHotkeyListener);
 		keyManager.unregisterKeyListener(questionHotkeyListener);
 		keyManager.unregisterKeyListener(attackHotkeyListener);
@@ -174,21 +172,6 @@ public class PartyPingsExtendedPlugin extends Plugin
 		public void hotkeyPressed()
 		{
 			latchedPing = PingType.DEFAULT;
-		}
-
-		@Override
-		public void hotkeyReleased()
-		{
-			latchedPing = null;
-		}
-	};
-
-	private final HotkeyListener avoidHotkeyListener = new HotkeyListener(() -> config.avoidPingHotkey())
-	{
-		@Override
-		public void hotkeyPressed()
-		{
-			latchedPing = PingType.AVOID;
 		}
 
 		@Override
@@ -371,9 +354,6 @@ public class PartyPingsExtendedPlugin extends Plugin
 			case DEFAULT:
 				pingType = PingType.DEFAULT;
 				break;
-			case AVOID:
-				pingType = PingType.AVOID;
-				break;
 			case CAUTION:
 				pingType = PingType.CAUTION;
 				break;
@@ -458,10 +438,6 @@ public class PartyPingsExtendedPlugin extends Plugin
 		if (config.wheelDefault() && quick != PingType.DEFAULT)
 		{
 			types.add(PingType.DEFAULT);
-		}
-		if (config.wheelAvoid())
-		{
-			types.add(PingType.AVOID);
 		}
 		if (config.wheelCaution())
 		{

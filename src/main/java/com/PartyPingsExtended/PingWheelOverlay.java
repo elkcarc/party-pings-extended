@@ -29,7 +29,6 @@ class PingWheelOverlay extends Overlay
 	private final net.runelite.api.Client client;
 	private final PartyPingsExtendedPlugin plugin;
 	private final PartyPingsExtendedConfig config;
-	private final BufferedImage AVOID;
 	private final BufferedImage CAUTION;
 	private final BufferedImage QUESTION;
 	private final BufferedImage ATTACK;
@@ -55,7 +54,6 @@ class PingWheelOverlay extends Overlay
 		this.config = config;
 		setPosition(OverlayPosition.DYNAMIC);
 		setLayer(OverlayLayer.ALWAYS_ON_TOP);
-		AVOID = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/avoidmark.png");
 		CAUTION = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/exclamationmark.png");
 		QUESTION = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/questionmark.png");
 		ATTACK = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/attackmark.png");
@@ -75,9 +73,6 @@ class PingWheelOverlay extends Overlay
 			case DEFAULT:
 				//the default ping has no glyph
 				return null;
-			case AVOID:
-				base = AVOID;
-				break;
 			case CAUTION:
 				base = CAUTION;
 				break;

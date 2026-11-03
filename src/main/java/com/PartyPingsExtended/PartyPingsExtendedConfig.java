@@ -70,18 +70,6 @@ public interface PartyPingsExtendedConfig extends Config
 	}
 
 	@ConfigItem(
-			keyName = "wheelAvoid",
-			name = "Avoid",
-			description = "Show the avoid option on the wheel.",
-			position = 8,
-			section = "pingWheelSection"
-	)
-	default boolean wheelAvoid()
-	{
-		return true;
-	}
-
-	@ConfigItem(
 			keyName = "wheelCaution",
 			name = "Caution",
 			description = "Show the caution option on the wheel.",
@@ -247,7 +235,7 @@ public interface PartyPingsExtendedConfig extends Config
 	)
 	default int wheelDiameter()
 	{
-		return 130;
+		return 150;
 	}
 
 	@ConfigSection(
@@ -266,18 +254,6 @@ public interface PartyPingsExtendedConfig extends Config
 			section = "hotkeySection"
 	)
 	default Keybind defaultPingHotkey()
-	{
-		return Keybind.NOT_SET;
-	}
-
-	@ConfigItem(
-			keyName = "avoidPingHotkey",
-			name = "Avoid ping hotkey",
-			description = "A tile ping with an avoid symbol.",
-			position = 15,
-			section = "hotkeySection"
-	)
-	default Keybind avoidPingHotkey()
 	{
 		return Keybind.NOT_SET;
 	}

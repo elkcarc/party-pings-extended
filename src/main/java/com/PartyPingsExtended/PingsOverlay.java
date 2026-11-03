@@ -19,7 +19,6 @@ class PingsOverlay extends Overlay
     private final Client client;
     private final PartyPingsExtendedPlugin plugin;
     private final PartyPingsExtendedConfig config;
-    private final BufferedImage AVOID;
     private final BufferedImage CAUTION;
     private final BufferedImage QUESTION;
     private final BufferedImage ATTACK;
@@ -32,7 +31,6 @@ class PingsOverlay extends Overlay
     {
         switch (type)
         {
-            case AVOID:
             case CAUTION:
             case QUESTION:
                 return true;
@@ -48,7 +46,6 @@ class PingsOverlay extends Overlay
         this.plugin = plugin;
         this.config = config;
         setPosition(OverlayPosition.DYNAMIC);
-        AVOID = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/avoidmark.png");
         CAUTION = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/exclamationmark.png");
         QUESTION = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/questionmark.png");
         ATTACK = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/attackmark.png");
@@ -121,8 +118,6 @@ class PingsOverlay extends Overlay
     {
         switch (type)
         {
-            case AVOID:
-                return AVOID;
             case CAUTION:
                 return CAUTION;
             case QUESTION:
@@ -138,7 +133,7 @@ class PingsOverlay extends Overlay
             case MELEE:
                 return MELEE;
             default:
-                return AVOID;
+                return CAUTION;
         }
     }
 
