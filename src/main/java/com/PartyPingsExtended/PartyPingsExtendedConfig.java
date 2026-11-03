@@ -17,10 +17,21 @@ public interface PartyPingsExtendedConfig extends Config
 	@ConfigItem(
 			keyName = "recolorGlyphs",
 			name = "Recolor Glyphs",
-			description = "Recolor the three text Glyphs to match the ping color selected in the party plugin",
+			description = "Recolor the two text Glyphs to match the ping color selected in the party plugin",
 			position = 2
 	)
 	default boolean recolorGlyphs()
+	{
+		return true;
+	}
+
+	@ConfigItem(
+			keyName = "fadeGlyphs",
+			name = "Fade Glyphs",
+			description = "Fade the glyphs out over time.
+			position = 3
+	)
+	default boolean fadeGlyphs()
 	{
 		return true;
 	}
@@ -162,7 +173,7 @@ public interface PartyPingsExtendedConfig extends Config
 	)
 	default boolean wheelCancel()
 	{
-		return false;
+		return true;
 	}
 
 	@ConfigSection(

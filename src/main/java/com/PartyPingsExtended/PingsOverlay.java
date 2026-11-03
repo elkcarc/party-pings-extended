@@ -55,30 +55,41 @@ class PingsOverlay extends Overlay
         MELEE = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/Melee.png");
     }
 
+    // a non-fading glyph keeps its full opacity, but still has to disappear at
+    // some point: it lives for roughly the same span a fading one would
+    private static final long NO_FADE_LIFETIME_MS = 1000;
+
     @Override
     public Dimension render(Graphics2D graphics)
     {
-        synchronized (plugin.getPendingTilePingsExtended())
-        {
-            final Iterator<PartyTilePingDataExtended> iterator = plugin.getPendingTilePingsExtended().iterator();
+    	synchronized (plugin.getPendingTilePingsExtended())
+    	{
+    		final Iterator<PartyTilePingDataExtended> iterator = plugin.getPendingTilePingsExtended().iterator();
 
-            while (iterator.hasNext())
-            {
-                PartyTilePingDataExtended next = iterator.next();
+    		while (iterator.hasNext())
+    		{
+    			PartyTilePingDataExtended next = iterator.next();
 
-                if (next.getAlpha() <= 0)
-                {
-                    iterator.remove();
-                    continue;
-                }
+    			if (next.getAlpha() <= 0)
+    			{
+    				iterator.remove();
+    				continue;
+    			}
 
-                renderGlyph(graphics, next);
+    			renderGlyph(graphics, next);
 
-                long elapsedTimeMillis = (System.nanoTime() - next.getCreationTime()) / 1000000;
-                next.setAlpha((int) Math.max(0, 255 - (elapsedTimeMillis / 4)));
-            }
-        }
-        return null;
+    			long elapsedTimeMillis = (System.nanoTime() - next.getCreationTime()) / 1000000;
+    			if (config.fadeGlyphs())
+    			{
+    				next.setAlpha((int) Math.max(0, 255 - (elapsedTimeMillis / 4)));
+    			}
+    			else
+    			{
+    				next.setAlpha(elapsedTimeMillis >= NO_FADE_LIFETIME_MS ? 0 : 255);
+    			}
+    		}
+    	}
+    	return null;
     }
 
     private void renderGlyph(final Graphics2D graphics, final PartyTilePingDataExtended ping)
