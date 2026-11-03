@@ -27,6 +27,9 @@ class PingsOverlay extends Overlay
     private final BufferedImage RANGE;
     private final BufferedImage MELEE;
 
+    //storage of colored icons
+    private final java.util.Map<String, BufferedImage> tintedGlyphs = new java.util.concurrent.ConcurrentHashMap<>();
+
     static boolean isRecolorable(PingType type)
     {
         switch (type)
@@ -100,22 +103,18 @@ class PingsOverlay extends Overlay
             return;
         }
 
-
-        final int step = ping.getAlpha() / 16;
-        if (step != ping.getStep())
-        {
-            BufferedImage Glyph = baseGlyph(ping.getPingType());
-            if (config.recolorGlyphs() && isRecolorable(ping.getPingType()))
-            {
-                Glyph = tint(Glyph, ping.getColor());
-            }
-            ping.setStep(step);
-            ping.setFaded(applyAlpha(Glyph, step * 16));
-        }
-        final BufferedImage Glyph = ping.getFaded();
+        final BufferedImage Glyph = glyph(ping.getPingType(), ping.getColor());
         if (Glyph == null)
         {
             return;
+        }
+
+        //apply alpha
+        final java.awt.Composite original = graphics.getComposite();
+        final int alpha = ping.getAlpha();
+        if (alpha < 255)
+        {
+            graphics.setComposite(java.awt.AlphaComposite.getInstance(java.awt.AlphaComposite.SRC_OVER, alpha / 255f));
         }
 
         net.runelite.api.Point canvasLoc = Perspective.getCanvasImageLocation(client, localPoint, Glyph, 120 + (int) (10 * Math.sin(client.getGameCycle() / 6.0)));
@@ -123,6 +122,19 @@ class PingsOverlay extends Overlay
         {
             OverlayUtil.renderImageLocation(graphics, canvasLoc, Glyph);
         }
+        graphics.setComposite(original);
+    }
+
+    //color function
+    private BufferedImage glyph(final PingType type, final Color color)
+    {
+        final BufferedImage base = baseGlyph(type);
+        if (base == null || !config.recolorGlyphs() || !isRecolorable(type) || color == null)
+        {
+            return base;
+        }
+        final String key = type.name() + ":" + (color.getRGB() & 0xFFFFFF);
+        return tintedGlyphs.computeIfAbsent(key, k -> tint(base, color));
     }
 
     BufferedImage baseGlyph(final PingType type)
@@ -169,29 +181,4 @@ class PingsOverlay extends Overlay
         return out;
     }
 
-    static BufferedImage applyAlpha(BufferedImage src, int alpha) //fade out helper
-    {
-        if (alpha >= 255)
-        {
-            return src;
-        }
-        int w = src.getWidth();
-        int h = src.getHeight();
-        BufferedImage out = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
-        for (int y = 0; y < h; y++)
-        {
-            for (int x = 0; x < w; x++)
-            {
-                int argb = src.getRGB(x, y);
-                int sa = (argb >>> 24) & 0xFF;
-                if (sa == 0)
-                {
-                    continue;
-                }
-                int fa = (sa * alpha) / 255;
-                out.setRGB(x, y, ((fa << 24) | (argb & 0x00FFFFFF)));
-            }
-        }
-        return out;
-    }
 }

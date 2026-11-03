@@ -16,13 +16,6 @@ class PartyTilePingDataExtended {
 	@Setter
 	private Color color = Color.YELLOW;
 
-	// the faded copy of the glyph
-	@Setter
-	private BufferedImage faded;
-
-	@Setter
-	private int step = -1;
-
 	// fade state: starts at 255, decays with elapsed time in the overlay
 	@Setter
 	private int alpha = 255;

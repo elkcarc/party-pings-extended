@@ -5,9 +5,6 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
-import java.awt.geom.Area;
-import java.awt.geom.Ellipse2D;
-import java.awt.geom.Path2D;
 import java.awt.image.BufferedImage;
 import javax.inject.Inject;
 import net.runelite.client.ui.overlay.Overlay;
@@ -65,7 +62,7 @@ class PingWheelOverlay extends Overlay
 	}
 
 	//the glyph for a type
-	private BufferedImage icon(final PartyPingsExtendedPlugin.WheelSession session, final PingType type)
+	BufferedImage glyphFor(final PingType type)
 	{
 		final BufferedImage base;
 		switch (type)
@@ -102,7 +99,7 @@ class PingWheelOverlay extends Overlay
 		}
 
 		// glyphs scale with the wheel, shrunk by the fixed factor
-		final double scale = (session.geom.outer / ICON_REF_OUTER) * ICON_SHRINK;
+		final double scale = (plugin.wheelOuter() / ICON_REF_OUTER) * ICON_SHRINK;
 		final boolean recolor = config.recolorGlyphs() && PingsOverlay.isRecolorable(type);
 		final Color c = recolor ? plugin.myColor() : null;
 		final String key = type.name() + ":" + (c == null ? "-" : Integer.toString(c.getRGB() & 0xFFFFFF))
@@ -249,8 +246,7 @@ class PingWheelOverlay extends Overlay
 		graphics.setColor(centerHovered ? config.wheelHoverBorder() : config.wheelBorderColor());
 		graphics.fill(centerHovered ? g.hubBorderHover : g.hubBorder);
 
-		final PingType quick = config.quickPing();
-		final BufferedImage quickGlyph = icon(session, quick);
+		final BufferedImage quickGlyph = session.quickGlyph;
 		if (quickGlyph != null) // scale with the wheel size
 		{
 			graphics.drawImage(quickGlyph, session.center.x - quickGlyph.getWidth() / 2,
@@ -271,7 +267,7 @@ class PingWheelOverlay extends Overlay
 			final double rad = Math.toRadians(seg.centerDeg);
 			final int ix = (int) Math.round(session.center.x + Math.cos(rad) * iconRadius);
 			final int iy = (int) Math.round(session.center.y + Math.sin(rad) * iconRadius);
-			final BufferedImage glyph = icon(session, seg.type);
+			final BufferedImage glyph = seg.glyph;
 			if (glyph != null) // scale with the wheel size
 			{
 				graphics.drawImage(glyph, ix - glyph.getWidth() / 2, iy - glyph.getHeight() / 2, null);

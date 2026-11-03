@@ -4,7 +4,6 @@ import com.google.inject.Provides;
 import javax.inject.Inject;
 
 import lombok.Getter;
-import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.*;
 import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.events.FocusChanged;
@@ -18,13 +17,14 @@ import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.plugins.party.PartyPlugin;
 
 import java.awt.*;
+import java.awt.image.BufferedImage;
 import java.util.*;
 import java.util.List;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 import net.runelite.api.Client;
-import net.runelite.client.Notifier;
 import net.runelite.client.callback.ClientThread;
-import net.runelite.client.callback.Hooks;
 import net.runelite.client.party.PartyMember;
 import net.runelite.client.party.PartyService;
 import net.runelite.client.party.WSClient;
@@ -33,10 +33,10 @@ import net.runelite.client.plugins.party.PartyPluginService;
 import net.runelite.client.plugins.party.data.PartyMemberData;
 import net.runelite.client.plugins.party.messages.TilePing;
 import net.runelite.client.ui.overlay.OverlayManager;
+import net.runelite.client.config.Keybind;
 import net.runelite.client.util.HotkeyListener;
 import net.runelite.client.input.KeyManager;
 
-@Slf4j
 @PluginDescriptor(
 	name = "Party Pings Extended"
 )
@@ -68,9 +68,6 @@ public class PartyPingsExtendedPlugin extends Plugin
 	private PartyService party;
 
 	@Inject
-	private Hooks hooks;
-
-	@Inject
 	private OverlayManager overlayManager;
 
 	@Inject
@@ -81,9 +78,6 @@ public class PartyPingsExtendedPlugin extends Plugin
 
 	@Inject
 	private PartyPingsExtendedConfig config;
-
-	@Inject
-	private Notifier notifier;
 
 	@Inject
 	private KeyManager keyManager;
@@ -166,127 +160,34 @@ public class PartyPingsExtendedPlugin extends Plugin
 		}
 	}
 
-	private final HotkeyListener defaultHotkeyListener = new HotkeyListener(() -> config.defaultPingHotkey())
+
+	private static HotkeyListener typeListener(final Supplier<Keybind> bind, final PingType type,
+											   final Consumer<PingType> latch)
 	{
-		@Override
-		public void hotkeyPressed()
+		return new HotkeyListener(bind)
 		{
-			latchedPing = PingType.DEFAULT;
-		}
+			@Override
+			public void hotkeyPressed()
+			{
+				latch.accept(type);
+			}
 
-		@Override
-		public void hotkeyReleased()
-		{
-			latchedPing = null;
-		}
-	};
+			@Override
+			public void hotkeyReleased()
+			{
+				latch.accept(null);
+			}
+		};
+	}
 
-	private final HotkeyListener cautionHotkeyListener = new HotkeyListener(() -> config.cautionPingHotkey())
-	{
-		@Override
-		public void hotkeyPressed()
-		{
-			latchedPing = PingType.CAUTION;
-		}
-
-		@Override
-		public void hotkeyReleased()
-		{
-			latchedPing = null;
-		}
-	};
-
-	private final HotkeyListener questionHotkeyListener = new HotkeyListener(() -> config.questionPingHotkey())
-	{
-		@Override
-		public void hotkeyPressed()
-		{
-			latchedPing = PingType.QUESTION;
-		}
-
-		@Override
-		public void hotkeyReleased()
-		{
-			latchedPing = null;
-		}
-	};
-
-	private final HotkeyListener attackHotkeyListener = new HotkeyListener(() -> config.attackPingHotkey())
-	{
-		@Override
-		public void hotkeyPressed()
-		{
-			latchedPing = PingType.ATTACK;
-		}
-
-		@Override
-		public void hotkeyReleased()
-		{
-			latchedPing = null;
-		}
-	};
-
-	private final HotkeyListener defendHotkeyListener = new HotkeyListener(() -> config.defendPingHotkey())
-	{
-		@Override
-		public void hotkeyPressed()
-		{
-			latchedPing = PingType.DEFEND;
-		}
-
-		@Override
-		public void hotkeyReleased()
-		{
-			latchedPing = null;
-		}
-	};
-
-	private final HotkeyListener mageHotkeyListener = new HotkeyListener(() -> config.magePingHotkey())
-	{
-		@Override
-		public void hotkeyPressed()
-		{
-			latchedPing = PingType.MAGE;
-		}
-
-		@Override
-		public void hotkeyReleased()
-		{
-			latchedPing = null;
-		}
-	};
-
-	private final HotkeyListener rangeHotkeyListener = new HotkeyListener(() -> config.rangePingHotkey())
-	{
-		@Override
-		public void hotkeyPressed()
-		{
-			latchedPing = PingType.RANGE;
-		}
-
-		@Override
-		public void hotkeyReleased()
-		{
-			latchedPing = null;
-		}
-	};
-
-	private final HotkeyListener meleeHotkeyListener = new HotkeyListener(() -> config.meleePingHotkey())
-	{
-		@Override
-		public void hotkeyPressed()
-		{
-			latchedPing = PingType.MELEE;
-		}
-
-		@Override
-		public void hotkeyReleased()
-		{
-			latchedPing = null;
-		}
-	};
-
-
+	private final HotkeyListener defaultHotkeyListener = typeListener(() -> config.defaultPingHotkey(), PingType.DEFAULT, t -> latchedPing = t);
+	private final HotkeyListener cautionHotkeyListener = typeListener(() -> config.cautionPingHotkey(), PingType.CAUTION, t -> latchedPing = t);
+	private final HotkeyListener questionHotkeyListener = typeListener(() -> config.questionPingHotkey(), PingType.QUESTION, t -> latchedPing = t);
+	private final HotkeyListener attackHotkeyListener = typeListener(() -> config.attackPingHotkey(), PingType.ATTACK, t -> latchedPing = t);
+	private final HotkeyListener defendHotkeyListener = typeListener(() -> config.defendPingHotkey(), PingType.DEFEND, t -> latchedPing = t);
+	private final HotkeyListener mageHotkeyListener = typeListener(() -> config.magePingHotkey(), PingType.MAGE, t -> latchedPing = t);
+	private final HotkeyListener rangeHotkeyListener = typeListener(() -> config.rangePingHotkey(), PingType.RANGE, t -> latchedPing = t);
+	private final HotkeyListener meleeHotkeyListener = typeListener(() -> config.meleePingHotkey(), PingType.MELEE, t -> latchedPing = t);
 
 	boolean inParty()
 	{
@@ -348,36 +249,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 			return;
 		}
 
-		PingType pingType;
-		switch (latchedPing)
-		{
-			case DEFAULT:
-				pingType = PingType.DEFAULT;
-				break;
-			case CAUTION:
-				pingType = PingType.CAUTION;
-				break;
-			case QUESTION:
-				pingType = PingType.QUESTION;
-				break;
-			case ATTACK:
-				pingType = PingType.ATTACK;
-				break;
-			case DEFEND:
-				pingType = PingType.DEFEND;
-				break;
-			case MAGE:
-				pingType = PingType.MAGE;
-				break;
-			case RANGE:
-				pingType = PingType.RANGE;
-				break;
-			case MELEE:
-				pingType = PingType.MELEE;
-				break;
-			default:
-				return;
-		}
+		final PingType pingType = latchedPing;
 
 		event.consume();
 		final WorldPoint point = selectedSceneTile.getWorldLocation();
@@ -397,11 +269,14 @@ public class PartyPingsExtendedPlugin extends Plugin
 				if (tile != null && mouse != null && mouse.getX() != -1)
 				{
 					java.awt.Point aim = new java.awt.Point(mouse.getX(), mouse.getY());
-					//build geometry for the wheel one time, then cache
+					// build the wheel geometry once, then cache
 					final List<PingType> types = enabledTypes();
 					final double outer = wheelOuter();
 					final double hub = wheelHub();
-					wheelSession = new WheelSession(aim, tile.getWorldLocation(), buildGeom(aim, types, hub, hub + GAP_WIDTH, outer));
+					final WheelGeom geom = buildGeom(aim, types, hub, hub + GAP_WIDTH, outer,
+						pingWheelOverlay::glyphFor);
+					wheelSession = new WheelSession(aim, tile.getWorldLocation(), geom,
+						pingWheelOverlay.glyphFor(config.quickPing()));
 				}
 			}
 		}
@@ -484,14 +359,17 @@ public class PartyPingsExtendedPlugin extends Plugin
 		final java.awt.Shape border;
 		final java.awt.Shape borderHover;
 		final double centerDeg;
+		final java.awt.image.BufferedImage glyph;
 
-		WheelSegment(PingType type, java.awt.Shape fill, java.awt.Shape border, java.awt.Shape borderHover, double centerDeg)
+		WheelSegment(PingType type, java.awt.Shape fill, java.awt.Shape border, java.awt.Shape borderHover,
+					 double centerDeg, java.awt.image.BufferedImage glyph)
 		{
 			this.type = type;
 			this.fill = fill;
 			this.border = border;
 			this.borderHover = borderHover;
 			this.centerDeg = centerDeg;
+			this.glyph = glyph;
 		}
 	}
 
@@ -502,25 +380,24 @@ public class PartyPingsExtendedPlugin extends Plugin
 		final java.awt.Shape hubBorder;
 		final java.awt.Shape hubBorderHover;
 		final java.util.List<WheelSegment> segments;
-		final double hub;
 		final double inner;
 		final double outer;
 
 		WheelGeom(java.awt.Shape hubFill, java.awt.Shape hubBorder, java.awt.Shape hubBorderHover,
-				  java.util.List<WheelSegment> segments, double hub, double inner, double outer)
+				  java.util.List<WheelSegment> segments, double inner, double outer)
 		{
 			this.hubFill = hubFill;
 			this.hubBorder = hubBorder;
 			this.hubBorderHover = hubBorderHover;
 			this.segments = segments;
-			this.hub = hub;
 			this.inner = inner;
 			this.outer = outer;
 		}
 	}
 
 	// build the wheel
-	static WheelGeom buildGeom(java.awt.Point center, java.util.List<PingType> types, double hub, double inner, double outer)
+	static WheelGeom buildGeom(java.awt.Point center, java.util.List<PingType> types, double hub, double inner, double outer,
+							   java.util.function.Function<PingType, BufferedImage> glyphFor)
 	{
 		final int cx = center.x;
 		final int cy = center.y;
@@ -554,9 +431,9 @@ public class PartyPingsExtendedPlugin extends Plugin
 
 			final java.awt.geom.Area border = wedgeRing(cx, cy, outer - bw, inner + bw, count, centerDeg, halfGap + bw);
 			final java.awt.geom.Area borderHover = wedgeRing(cx, cy, outer - bhb, inner + bhb, count, centerDeg, halfGap + bhb);
-			segments.add(new WheelSegment(types.get(i), fill, border, borderHover, centerDeg));
+			segments.add(new WheelSegment(types.get(i), fill, border, borderHover, centerDeg, glyphFor.apply(types.get(i))));
 		}
-		return new WheelGeom(hubCircle, hubBorder, hubBorderHover, segments, hub, inner, outer);
+		return new WheelGeom(hubCircle, hubBorder, hubBorderHover, segments, inner, outer);
 	}
 
 	private static java.awt.geom.Area wedgeRing(int cx, int cy, double outer, double inner, int count, double centerDeg, double inset)
@@ -634,20 +511,21 @@ public class PartyPingsExtendedPlugin extends Plugin
 		return wheelOuter() * WHEEL_DEAD_ZONE / (double) WHEEL_RADIUS;
 	}
 
-	// the state of one open wheel: fixed center and target tile, plus the
-	// geometry built once at open time and the live aim point
+	//the state of the open wheel
 	static class WheelSession
 	{
 		final java.awt.Point center;
 		final WorldPoint target;
 		final WheelGeom geom;
+		final BufferedImage quickGlyph;
 		volatile java.awt.Point drag;
 
-		WheelSession(java.awt.Point center, WorldPoint target, WheelGeom geom)
+		WheelSession(java.awt.Point center, WorldPoint target, WheelGeom geom, BufferedImage quickGlyph)
 		{
 			this.center = center;
 			this.target = target;
 			this.geom = geom;
+			this.quickGlyph = quickGlyph;
 			this.drag = center;
 		}
 	}
