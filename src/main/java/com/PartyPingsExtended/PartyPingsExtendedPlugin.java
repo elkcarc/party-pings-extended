@@ -134,6 +134,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 		keyManager.unregisterKeyListener(wheelHotkeyListener);
 		overlayManager.remove(pingsOverlay);
 		overlayManager.remove(pingWheelOverlay);
+		pingsOverlay.clearGlyphCache();
 		pingWheelOverlay.clearGlyphCache();
 		wheelSession = null;
 		pendingTilePingsExtended.clear();
@@ -143,10 +144,18 @@ public class PartyPingsExtendedPlugin extends Plugin
 	@Subscribe
 	public void onConfigChanged(ConfigChanged event)
 	{
-		if (PartyPingsExtendedConfig.GROUP.equals(event.getGroup())
-			&& ("recolorGlyphs".equals(event.getKey()) || "wheelDiameter".equals(event.getKey())))
+		if (!PartyPingsExtendedConfig.GROUP.equals(event.getGroup()))
 		{
+			return;
+		}
+		final String key = event.getKey();
+		if ("recolorGlyphs".equals(key) || "wheelDiameter".equals(key))
+		{
+			// the scene cache is tint-only; the wheel cache is tint+scale, and a
+			// diameter change also makes any open geometry stale
+			pingsOverlay.clearGlyphCache();
 			pingWheelOverlay.clearGlyphCache();
+			wheelSession = null;
 		}
 	}
 
@@ -275,8 +284,9 @@ public class PartyPingsExtendedPlugin extends Plugin
 					final double hub = wheelHub();
 					final WheelGeom geom = buildGeom(aim, types, hub, hub + GAP_WIDTH, outer,
 						pingWheelOverlay::glyphFor);
-					wheelSession = new WheelSession(aim, tile.getWorldLocation(), geom,
-						pingWheelOverlay.glyphFor(config.quickPing()));
+					final PingType quick = config.quickPing();
+					wheelSession = new WheelSession(aim, tile.getWorldLocation(), geom, quick,
+						pingWheelOverlay.glyphFor(quick));
 				}
 			}
 		}
@@ -289,7 +299,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 			{
 				wheelSession = null;
 				final WheelSegment seg = hoveredSegment(session);
-				PingType selected = seg == null ? config.quickPing() : seg.type;
+				PingType selected = seg == null ? session.quickPing : seg.type;
 				if (selected != null)
 				{
 					sendPing(selected, session.target);
@@ -304,11 +314,12 @@ public class PartyPingsExtendedPlugin extends Plugin
 		}
 	};
 
-	// The rim options currently enabled in config, in enum order. The wheel
-	// divides itself evenly among exactly these. The quick ping is excluded (it shows in the center instead)
+	// The rim options currently enabled in config, in enum order: each type is
+	// paired with the toggle that shows it. The quick ping is excluded, since it
+	// shows in the center instead
 	java.util.List<PingType> enabledTypes()
 	{
-		java.util.List<PingType> types = new ArrayList<>();
+		final java.util.List<PingType> types = new ArrayList<>();
 		if (config.wheelDefault())
 		{
 			types.add(PingType.DEFAULT);
@@ -345,8 +356,7 @@ public class PartyPingsExtendedPlugin extends Plugin
 		{
 			types.add(PingType.CANCEL);
 		}
-		// the quick ping lives in the centre only, never on the rim, whichever
-		// type it happens to be
+		// the quick ping lives in the centre only, never on the rim
 		types.remove(config.quickPing());
 		return types;
 	}
@@ -360,9 +370,12 @@ public class PartyPingsExtendedPlugin extends Plugin
 		final java.awt.Shape borderHover;
 		final double centerDeg;
 		final java.awt.image.BufferedImage glyph;
+		// where the glyph's top-left belongs, resolved once at open time
+		final int iconX;
+		final int iconY;
 
 		WheelSegment(PingType type, java.awt.Shape fill, java.awt.Shape border, java.awt.Shape borderHover,
-					 double centerDeg, java.awt.image.BufferedImage glyph)
+					 double centerDeg, java.awt.image.BufferedImage glyph, int iconX, int iconY)
 		{
 			this.type = type;
 			this.fill = fill;
@@ -370,6 +383,8 @@ public class PartyPingsExtendedPlugin extends Plugin
 			this.borderHover = borderHover;
 			this.centerDeg = centerDeg;
 			this.glyph = glyph;
+			this.iconX = iconX;
+			this.iconY = iconY;
 		}
 	}
 
@@ -380,16 +395,18 @@ public class PartyPingsExtendedPlugin extends Plugin
 		final java.awt.Shape hubBorder;
 		final java.awt.Shape hubBorderHover;
 		final java.util.List<WheelSegment> segments;
+		final double hub;
 		final double inner;
 		final double outer;
 
 		WheelGeom(java.awt.Shape hubFill, java.awt.Shape hubBorder, java.awt.Shape hubBorderHover,
-				  java.util.List<WheelSegment> segments, double inner, double outer)
+				  java.util.List<WheelSegment> segments, double hub, double inner, double outer)
 		{
 			this.hubFill = hubFill;
 			this.hubBorder = hubBorder;
 			this.hubBorderHover = hubBorderHover;
 			this.segments = segments;
+			this.hub = hub;
 			this.inner = inner;
 			this.outer = outer;
 		}
@@ -431,9 +448,17 @@ public class PartyPingsExtendedPlugin extends Plugin
 
 			final java.awt.geom.Area border = wedgeRing(cx, cy, outer - bw, inner + bw, count, centerDeg, halfGap + bw);
 			final java.awt.geom.Area borderHover = wedgeRing(cx, cy, outer - bhb, inner + bhb, count, centerDeg, halfGap + bhb);
-			segments.add(new WheelSegment(types.get(i), fill, border, borderHover, centerDeg, glyphFor.apply(types.get(i))));
+			final java.awt.image.BufferedImage glyph = glyphFor.apply(types.get(i));
+			// icon anchors depend only on the frozen radii, so resolve them here
+			final double rad = Math.toRadians(centerDeg);
+			final double iconRadius = (inner + outer) / 2 + 2;
+			final int ix = (int) Math.round(cx + Math.cos(rad) * iconRadius);
+			final int iy = (int) Math.round(cy + Math.sin(rad) * iconRadius);
+			segments.add(new WheelSegment(types.get(i), fill, border, borderHover, centerDeg, glyph,
+				glyph == null ? ix : ix - glyph.getWidth() / 2,
+				glyph == null ? iy : iy - glyph.getHeight() / 2));
 		}
-		return new WheelGeom(hubCircle, hubBorder, hubBorderHover, segments, inner, outer);
+		return new WheelGeom(hubCircle, hubBorder, hubBorderHover, segments, hub, inner, outer);
 	}
 
 	private static java.awt.geom.Area wedgeRing(int cx, int cy, double outer, double inner, int count, double centerDeg, double inset)
@@ -450,27 +475,24 @@ public class PartyPingsExtendedPlugin extends Plugin
 		return ring;
 	}
 
-	//wheel segment selection
+	//wheel segment selection: radius and angle arithmetic only, no shape queries
 	WheelSegment hoveredSegment(WheelSession session)
 	{
 		final WheelGeom g = session.geom;
-		if (g.hubFill.contains(session.drag))
+		final double dx = session.drag.x - session.center.x;
+		final double dy = session.drag.y - session.center.y;
+		final double distSq = dx * dx + dy * dy;
+
+		if (distSq < g.hub * g.hub)
 		{
 			return null; //center selects the quick ping
-		}
-		for (WheelSegment seg : g.segments)
-		{
-			if (seg.fill.contains(session.drag))
-			{
-				return seg;
-			}
 		}
 		if (g.segments.isEmpty())
 		{
 			return null;
 		}
 		final double segment = 360.0 / g.segments.size();
-		final double angle = Math.toDegrees(Math.atan2(session.drag.y - session.center.y, session.drag.x - session.center.x));
+		final double angle = Math.toDegrees(Math.atan2(dy, dx));
 		return g.segments.get((int) Math.floor((((angle + 90 + segment / 2) % 360) + 360) % 360 / segment));
 	}
 
@@ -516,15 +538,20 @@ public class PartyPingsExtendedPlugin extends Plugin
 	{
 		final java.awt.Point center;
 		final WorldPoint target;
+		// the quick ping captured when the wheel opened, so the glyph shown and
+		// the type sent can never disagree
+		final PingType quickPing;
 		final WheelGeom geom;
 		final BufferedImage quickGlyph;
 		volatile java.awt.Point drag;
 
-		WheelSession(java.awt.Point center, WorldPoint target, WheelGeom geom, BufferedImage quickGlyph)
+		WheelSession(java.awt.Point center, WorldPoint target, WheelGeom geom, PingType quickPing,
+					 BufferedImage quickGlyph)
 		{
 			this.center = center;
 			this.target = target;
 			this.geom = geom;
+			this.quickPing = quickPing;
 			this.quickGlyph = quickGlyph;
 			this.drag = center;
 		}

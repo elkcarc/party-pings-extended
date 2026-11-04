@@ -11,88 +11,79 @@ import net.runelite.api.coords.LocalPoint;
 import net.runelite.client.ui.overlay.Overlay;
 import net.runelite.client.ui.overlay.OverlayPosition;
 import net.runelite.client.ui.overlay.OverlayUtil;
-import net.runelite.client.util.ImageUtil;
 
 @Singleton
 class PingsOverlay extends Overlay
 {
-    private final Client client;
-    private final PartyPingsExtendedPlugin plugin;
-    private final PartyPingsExtendedConfig config;
-    private final BufferedImage CAUTION;
-    private final BufferedImage QUESTION;
-    private final BufferedImage ATTACK;
-    private final BufferedImage DEFEND;
-    private final BufferedImage MAGE;
-    private final BufferedImage RANGE;
-    private final BufferedImage MELEE;
-
-    //storage of colored icons
-    private final java.util.Map<String, BufferedImage> tintedGlyphs = new java.util.concurrent.ConcurrentHashMap<>();
-
-    static boolean isRecolorable(PingType type)
-    {
-        switch (type)
-        {
-            case CAUTION:
-            case QUESTION:
-                return true;
-            default:
-                return false;
-        }
-    }
-
-    @Inject
-    private PingsOverlay(final Client client, final PartyPingsExtendedPlugin plugin, final PartyPingsExtendedConfig config)
-    {
-        this.client = client;
-        this.plugin = plugin;
-        this.config = config;
-        setPosition(OverlayPosition.DYNAMIC);
-        CAUTION = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/exclamationmark.png");
-        QUESTION = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/questionmark.png");
-        ATTACK = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/attackmark.png");
-        DEFEND = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/defendmark.png");
-        MAGE = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/Mage.png");
-        RANGE = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/Range.png");
-        MELEE = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/Melee.png");
-    }
-
     // a non-fading glyph keeps its full opacity, but still has to disappear at
     // some point: it lives for roughly the same span a fading one would
     private static final long NO_FADE_LIFETIME_MS = 1000;
 
+    private final Client client;
+    private final PartyPingsExtendedPlugin plugin;
+    private final PartyPingsExtendedConfig config;
+    private final Glyphs glyphs;
+
+    // tinted glyphs, built once per (type, color) and reused for every ping of
+    // that kind; fading is done by the graphics context at draw time
+    private final java.util.Map<String, BufferedImage> tintedGlyphs = new java.util.concurrent.ConcurrentHashMap<>();
+
+    void clearGlyphCache()
+    {
+        tintedGlyphs.clear();
+    }
+
+    @Inject
+    private PingsOverlay(final Client client, final PartyPingsExtendedPlugin plugin,
+                         final PartyPingsExtendedConfig config, final Glyphs glyphs)
+    {
+        this.client = client;
+        this.plugin = plugin;
+        this.config = config;
+        this.glyphs = glyphs;
+        setPosition(OverlayPosition.DYNAMIC);
+    }
+
     @Override
     public Dimension render(Graphics2D graphics)
     {
-    	synchronized (plugin.getPendingTilePingsExtended())
-    	{
-    		final Iterator<PartyTilePingDataExtended> iterator = plugin.getPendingTilePingsExtended().iterator();
+        synchronized (plugin.getPendingTilePingsExtended())
+        {
+            final Iterator<PartyTilePingDataExtended> iterator = plugin.getPendingTilePingsExtended().iterator();
 
-    		while (iterator.hasNext())
-    		{
-    			PartyTilePingDataExtended next = iterator.next();
+            // one composite swap for the whole frame instead of one per glyph
+            final Composite original = graphics.getComposite();
+            try
+            {
+                while (iterator.hasNext())
+                {
+                    PartyTilePingDataExtended next = iterator.next();
 
-    			if (next.getAlpha() <= 0)
-    			{
-    				iterator.remove();
-    				continue;
-    			}
+                    if (next.getAlpha() <= 0)
+                    {
+                        iterator.remove();
+                        continue;
+                    }
 
-    			renderGlyph(graphics, next);
+                    renderGlyph(graphics, next);
 
-    			long elapsedTimeMillis = (System.nanoTime() - next.getCreationTime()) / 1000000;
-    			if (config.fadeGlyphs())
-    			{
-    				next.setAlpha((int) Math.max(0, 255 - (elapsedTimeMillis / 4)));
-    			}
-    			else
-    			{
-    				next.setAlpha(elapsedTimeMillis >= NO_FADE_LIFETIME_MS ? 0 : 255);
-    			}
-    		}
-    	}
-    	return null;
+                    long elapsedTimeMillis = (System.nanoTime() - next.getCreationTime()) / 1000000;
+                    if (config.fadeGlyphs())
+                    {
+                        next.setAlpha((int) Math.max(0, 255 - (elapsedTimeMillis / 4)));
+                    }
+                    else
+                    {
+                        next.setAlpha(elapsedTimeMillis >= NO_FADE_LIFETIME_MS ? 0 : 255);
+                    }
+                }
+            }
+            finally
+            {
+                graphics.setComposite(original);
+            }
+        }
+        return null;
     }
 
     private void renderGlyph(final Graphics2D graphics, final PartyTilePingDataExtended ping)
@@ -109,55 +100,29 @@ class PingsOverlay extends Overlay
             return;
         }
 
-        //apply alpha
-        final java.awt.Composite original = graphics.getComposite();
         final int alpha = ping.getAlpha();
-        if (alpha < 255)
-        {
-            graphics.setComposite(java.awt.AlphaComposite.getInstance(java.awt.AlphaComposite.SRC_OVER, alpha / 255f));
-        }
+        graphics.setComposite(alpha < 255
+            ? java.awt.AlphaComposite.getInstance(java.awt.AlphaComposite.SRC_OVER, alpha / 255f)
+            : java.awt.AlphaComposite.SrcOver);
 
         net.runelite.api.Point canvasLoc = Perspective.getCanvasImageLocation(client, localPoint, Glyph, 120 + (int) (10 * Math.sin(client.getGameCycle() / 6.0)));
         if (canvasLoc != null)
         {
             OverlayUtil.renderImageLocation(graphics, canvasLoc, Glyph);
         }
-        graphics.setComposite(original);
     }
 
-    //color function
+    // the glyph for a type, tinted to the ping's carried color when this client
+    // recolors; cached per (type, color) so tinting runs once, not per frame
     private BufferedImage glyph(final PingType type, final Color color)
     {
-        final BufferedImage base = baseGlyph(type);
-        if (base == null || !config.recolorGlyphs() || !isRecolorable(type) || color == null)
+        final BufferedImage base = glyphs.base(type);
+        if (base == null || !config.recolorGlyphs() || !Glyphs.isRecolorable(type) || color == null)
         {
             return base;
         }
         final String key = type.name() + ":" + (color.getRGB() & 0xFFFFFF);
         return tintedGlyphs.computeIfAbsent(key, k -> tint(base, color));
-    }
-
-    BufferedImage baseGlyph(final PingType type)
-    {
-        switch (type)
-        {
-            case CAUTION:
-                return CAUTION;
-            case QUESTION:
-                return QUESTION;
-            case ATTACK:
-                return ATTACK;
-            case DEFEND:
-                return DEFEND;
-            case MAGE:
-                return MAGE;
-            case RANGE:
-                return RANGE;
-            case MELEE:
-                return MELEE;
-            default:
-                return CAUTION;
-        }
     }
 
     static BufferedImage tint(BufferedImage src, Color color) //recolor based on party color helper

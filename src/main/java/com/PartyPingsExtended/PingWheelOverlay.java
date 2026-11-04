@@ -26,14 +26,7 @@ class PingWheelOverlay extends Overlay
 	private final net.runelite.api.Client client;
 	private final PartyPingsExtendedPlugin plugin;
 	private final PartyPingsExtendedConfig config;
-	private final BufferedImage CAUTION;
-	private final BufferedImage QUESTION;
-	private final BufferedImage ATTACK;
-	private final BufferedImage DEFEND;
-	private final BufferedImage MAGE;
-	private final BufferedImage RANGE;
-	private final BufferedImage MELEE;
-	private final BufferedImage CANCEL;
+	private final Glyphs glyphs;
 
 	//Cached wheel glyphs to display on the wheel, keyed by type:color:scale
 	private final java.util.Map<String, BufferedImage> tintedGlyphs = new java.util.concurrent.ConcurrentHashMap<>();
@@ -44,63 +37,29 @@ class PingWheelOverlay extends Overlay
 	}
 
 	@Inject
-	PingWheelOverlay(final net.runelite.api.Client client, final PartyPingsExtendedPlugin plugin, final PartyPingsExtendedConfig config)
+	PingWheelOverlay(final net.runelite.api.Client client, final PartyPingsExtendedPlugin plugin,
+					 final PartyPingsExtendedConfig config, final Glyphs glyphs)
 	{
 		this.client = client;
 		this.plugin = plugin;
 		this.config = config;
 		setPosition(OverlayPosition.DYNAMIC);
 		setLayer(OverlayLayer.ALWAYS_ON_TOP);
-		CAUTION = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/exclamationmark.png");
-		QUESTION = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/questionmark.png");
-		ATTACK = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/attackmark.png");
-		DEFEND = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/defendmark.png");
-		MAGE = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/Mage.png");
-		RANGE = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/Range.png");
-		MELEE = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/Melee.png");
-		CANCEL = ImageUtil.loadImageResource(PartyPingsExtendedPlugin.class, "/cancelmark.png");
+		this.glyphs = glyphs;
 	}
 
-	//the glyph for a type
+	//the glyph for a type, tinted and rescaled once per (type, color, scale)
 	BufferedImage glyphFor(final PingType type)
 	{
-		final BufferedImage base;
-		switch (type)
+		final BufferedImage base = glyphs.base(type);
+		if (base == null)
 		{
-			case DEFAULT:
-				//the default ping has no glyph
-				return null;
-			case CAUTION:
-				base = CAUTION;
-				break;
-			case QUESTION:
-				base = QUESTION;
-				break;
-			case ATTACK:
-				base = ATTACK;
-				break;
-			case DEFEND:
-				base = DEFEND;
-				break;
-			case MAGE:
-				base = MAGE;
-				break;
-			case RANGE:
-				base = RANGE;
-				break;
-			case MELEE:
-				base = MELEE;
-				break;
-			case CANCEL:
-				base = CANCEL;
-				break;
-			default:
-				return null;
+			return null;
 		}
 
 		// glyphs scale with the wheel, shrunk by the fixed factor
 		final double scale = (plugin.wheelOuter() / ICON_REF_OUTER) * ICON_SHRINK;
-		final boolean recolor = config.recolorGlyphs() && PingsOverlay.isRecolorable(type);
+		final boolean recolor = config.recolorGlyphs() && Glyphs.isRecolorable(type);
 		final Color c = recolor ? plugin.myColor() : null;
 		final String key = type.name() + ":" + (c == null ? "-" : Integer.toString(c.getRGB() & 0xFFFFFF))
 			+ ":" + Math.round(scale * 100);
@@ -254,8 +213,7 @@ class PingWheelOverlay extends Overlay
 		}
 
 		// rim segments: fill + border fills from the frozen geometry, glyph at
-		// the segment's frozen mid-angle position
-		final double iconRadius = (g.inner + g.outer) / 2 + 2;
+		// its precomputed anchor
 		for (final PartyPingsExtendedPlugin.WheelSegment seg : g.segments)
 		{
 			final boolean hovered = hoveredSeg != null && hoveredSeg.type == seg.type;
@@ -264,13 +222,10 @@ class PingWheelOverlay extends Overlay
 			graphics.setColor(hovered ? config.wheelHoverBorder() : config.wheelBorderColor());
 			graphics.fill(hovered ? seg.borderHover : seg.border);
 
-			final double rad = Math.toRadians(seg.centerDeg);
-			final int ix = (int) Math.round(session.center.x + Math.cos(rad) * iconRadius);
-			final int iy = (int) Math.round(session.center.y + Math.sin(rad) * iconRadius);
 			final BufferedImage glyph = seg.glyph;
 			if (glyph != null) // scale with the wheel size
 			{
-				graphics.drawImage(glyph, ix - glyph.getWidth() / 2, iy - glyph.getHeight() / 2, null);
+				graphics.drawImage(glyph, seg.iconX, seg.iconY, null);
 			}
 		}
 

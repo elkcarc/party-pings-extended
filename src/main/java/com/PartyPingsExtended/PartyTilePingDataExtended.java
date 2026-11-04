@@ -1,7 +1,6 @@
 package com.PartyPingsExtended;
 
 import java.awt.Color;
-import java.awt.image.BufferedImage;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;

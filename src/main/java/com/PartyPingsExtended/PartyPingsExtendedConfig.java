@@ -18,7 +18,7 @@ public interface PartyPingsExtendedConfig extends Config
 			keyName = "recolorGlyphs",
 			name = "Recolor Glyphs",
 			description = "Recolor the two text Glyphs to match the ping color selected in the party plugin",
-			position = 2
+			position = 1
 	)
 	default boolean recolorGlyphs()
 	{
@@ -29,7 +29,7 @@ public interface PartyPingsExtendedConfig extends Config
 			keyName = "fadeGlyphs",
 			name = "Fade Glyphs",
 			description = "Fade the glyphs out over time",
-			position = 3
+			position = 2
 	)
 	default boolean fadeGlyphs()
 	{
@@ -39,7 +39,7 @@ public interface PartyPingsExtendedConfig extends Config
 	@ConfigSection(
    			name = "Ping wheel",
 			description = "A wheel to select which ping to send",
-			position = 4,
+			position = 3,
 			closedByDefault = true
 	)
 	String pingWheelSection = "pingWheelSection";
@@ -48,7 +48,7 @@ public interface PartyPingsExtendedConfig extends Config
 			keyName = "pingWheelHotkey",
 			name = "Wheel hotkey",
 			description = "Hotkey to show the ping wheel",
-			position = 4,
+			position = 1,
 			section = "pingWheelSection"
 	)
 	default Keybind pingWheelHotkey()
@@ -60,7 +60,7 @@ public interface PartyPingsExtendedConfig extends Config
 			keyName = "quickPing",
 			name = "Quick ping",
 			description = "The ping type in the center of the wheel.",
-			position = 5,
+			position = 2,
 			section = "pingWheelSection"
 	)
 	default PingType quickPing()
@@ -72,7 +72,7 @@ public interface PartyPingsExtendedConfig extends Config
 			keyName = "wheelDefault",
 			name = "Default",
 			description = "A standard ping with no Glyph.",
-			position = 6,
+			position = 3,
 			section = "pingWheelSection"
 	)
 	default boolean wheelDefault()
@@ -84,7 +84,7 @@ public interface PartyPingsExtendedConfig extends Config
 			keyName = "wheelCaution",
 			name = "Caution",
 			description = "Show the caution option on the wheel.",
-			position = 9,
+			position = 4,
 			section = "pingWheelSection"
 	)
 	default boolean wheelCaution()
@@ -96,7 +96,7 @@ public interface PartyPingsExtendedConfig extends Config
 			keyName = "wheelQuestion",
 			name = "Question",
 			description = "Show the question option on the wheel.",
-			position = 10,
+			position = 5,
 			section = "pingWheelSection"
 	)
 	default boolean wheelQuestion()
@@ -108,7 +108,7 @@ public interface PartyPingsExtendedConfig extends Config
 			keyName = "wheelAttack",
 			name = "Attack",
 			description = "Show the attack option on the wheel.",
-			position = 11,
+			position = 6,
 			section = "pingWheelSection"
 	)
 	default boolean wheelAttack()
@@ -120,7 +120,7 @@ public interface PartyPingsExtendedConfig extends Config
 			keyName = "wheelDefend",
 			name = "Defend",
 			description = "Show the defend option on the wheel.",
-			position = 12,
+			position = 7,
 			section = "pingWheelSection"
 	)
 	default boolean wheelDefend()
@@ -132,7 +132,7 @@ public interface PartyPingsExtendedConfig extends Config
 			keyName = "wheelMage",
 			name = "Mage",
 			description = "Show the mage pray option on the wheel.",
-			position = 13,
+			position = 8,
 			section = "pingWheelSection"
 	)
 	default boolean wheelMage()
@@ -144,7 +144,7 @@ public interface PartyPingsExtendedConfig extends Config
 			keyName = "wheelRange",
 			name = "Range",
 			description = "Show the range pray option on the wheel.",
-			position = 14,
+			position = 9,
 			section = "pingWheelSection"
 	)
 	default boolean wheelRange()
@@ -156,7 +156,7 @@ public interface PartyPingsExtendedConfig extends Config
 			keyName = "wheelMelee",
 			name = "Melee",
 			description = "Show the melee pray option on the wheel.",
-			position = 15,
+			position = 10,
 			section = "pingWheelSection"
 	)
 	default boolean wheelMelee()
@@ -168,7 +168,7 @@ public interface PartyPingsExtendedConfig extends Config
 			keyName = "wheelCancel",
 			name = "Cancel",
 			description = "Show the cancel option on the wheel. Selecting it sends nothing.",
-			position = 16,
+			position = 11,
 			section = "pingWheelSection"
 	)
 	default boolean wheelCancel()
@@ -179,7 +179,7 @@ public interface PartyPingsExtendedConfig extends Config
 	@ConfigSection(
 			name = "Wheel appearance",
 			description = "Colors and transparency of the ping wheel.",
-			position = 5,
+			position = 4,
 			closedByDefault = true
 	)
 	String appearanceSection = "appearanceSection";
@@ -252,7 +252,7 @@ public interface PartyPingsExtendedConfig extends Config
 	@ConfigSection(
 			name = "Hotkey pings",
 			description = "Individual hotkeys.",
-			position = 3,
+			position = 5,
 			closedByDefault = true
 	)
 	String hotkeySection = "hotkeySection";
@@ -261,7 +261,7 @@ public interface PartyPingsExtendedConfig extends Config
 			keyName = "defaultPingHotkey",
 			name = "Default ping hotkey",
 			description = "A plain tile ping with no glyph.",
-			position = 13,
+			position = 1,
 			section = "hotkeySection"
 	)
 	default Keybind defaultPingHotkey()
@@ -273,7 +273,7 @@ public interface PartyPingsExtendedConfig extends Config
 			keyName = "cautionPingHotkey",
 			name = "Caution ping hotkey",
 			description = "A tile ping with a caution symbol.",
-			position = 16,
+			position = 2,
 			section = "hotkeySection"
 	)
 	default Keybind cautionPingHotkey()
@@ -285,7 +285,7 @@ public interface PartyPingsExtendedConfig extends Config
 			keyName = "questionPingHotkey",
 			name = "Question ping hotkey",
 			description = "A tile ping with a question mark symbol.",
-			position = 17,
+			position = 3,
 			section = "hotkeySection"
 	)
 	default Keybind questionPingHotkey()
@@ -297,7 +297,7 @@ public interface PartyPingsExtendedConfig extends Config
 			keyName = "attackPingHotkey",
 		name = "Attack ping hotkey",
 			description = "A tile ping with an attack symbol.",
-			position = 18,
+			position = 4,
 			section = "hotkeySection"
 	)
 	default Keybind attackPingHotkey()
@@ -309,7 +309,7 @@ public interface PartyPingsExtendedConfig extends Config
 			keyName = "defendPingHotkey",
 			name = "Defend ping hotkey",
 			description = "A tile ping with a defend symbol.",
-			position = 19,
+			position = 5,
 			section = "hotkeySection"
 	)
 	default Keybind defendPingHotkey()
@@ -321,7 +321,7 @@ public interface PartyPingsExtendedConfig extends Config
 			keyName = "magePingHotkey",
 			name = "Mage ping hotkey",
 			description = "A tile ping with the mage pray symbol.",
-			position = 20,
+			position = 6,
 			section = "hotkeySection"
 	)
 	default Keybind magePingHotkey()
@@ -333,7 +333,7 @@ public interface PartyPingsExtendedConfig extends Config
 			keyName = "rangePingHotkey",
 			name = "Range ping hotkey",
 			description = "A tile ping with the range pray symbol.",
-			position = 21,
+			position = 7,
 			section = "hotkeySection"
 	)
 	default Keybind rangePingHotkey()
@@ -345,7 +345,7 @@ public interface PartyPingsExtendedConfig extends Config
 			keyName = "meleePingHotkey",
 			name = "Melee ping hotkey",
 			description = "A tile ping with the melee pray symbol.",
-			position = 22,
+			position = 8,
 			section = "hotkeySection"
 	)
 	default Keybind meleePingHotkey()
